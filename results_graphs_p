@@ -1,0 +1,50 @@
+{
+  "problem_sizes": [
+    {
+      "n": 4,
+      "p": 0.5,
+      "k": 3
+    },
+    {
+      "n": 7,
+      "p": 0.4,
+      "k": 4
+    }
+  ],
+  "num_graphs": 2,
+  "iters_per_graph": 3,
+  "results": [
+    [
+      {
+        "valid_cliques": 3,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      25
+    ],
+    [
+      {
+        "valid_cliques": 2,
+        "k_cliques": 2,
+        "found_solution": true
+      },
+      25
+    ],
+    [
+      {
+        "valid_cliques": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      40
+    ],
+    [
+      {
+        "valid_cliques": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      40
+    ]
+  ]
+}

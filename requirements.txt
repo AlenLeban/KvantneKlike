@@ -1,0 +1,5 @@
+dwave-ocean-sdk
+dwave-neal
+ipykernel
+tqdm
+matplotlib
