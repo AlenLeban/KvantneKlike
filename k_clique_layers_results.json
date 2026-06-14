@@ -1,0 +1,24 @@
+{
+  "num_graphs": 2,
+  "iters_per_graph": 1,
+  "k": 4,
+  "results_per_layer": {
+    "1": [
+      { "valid_cliques": 1, "k_cliques": 0, "found_solution": false },
+      { "valid_cliques": 0, "k_cliques": 0, "found_solution": false }
+    ],
+    "2": [
+      { "valid_cliques": 0, "k_cliques": 0, "found_solution": false },
+      { "valid_cliques": 0, "k_cliques": 0, "found_solution": false }
+    ],
+    "3": [
+      { "valid_cliques": 0, "k_cliques": 0, "found_solution": false },
+      { "valid_cliques": 0, "k_cliques": 0, "found_solution": false }
+    ],
+    "4": [
+      { "valid_cliques": 1, "k_cliques": 0, "found_solution": false },
+      { "valid_cliques": 0, "k_cliques": 0, "found_solution": false }
+    ]
+  },
+  "depths_per_layer": { "1": 18.0, "2": 27.0, "3": 36.0, "4": 45.0 }
+}
