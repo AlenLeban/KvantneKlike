@@ -3,3 +3,4 @@ dwave-neal
 ipykernel
 tqdm
 matplotlib
+qiskit-aer

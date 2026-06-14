@@ -1,0 +1,42 @@
+{
+  "problem_sizes": [
+    { "n": 9, "p": 0.2, "k": 5 },
+    { "n": 9, "p": 0.4, "k": 5 },
+    { "n": 9, "p": 0.6, "k": 5 }
+  ],
+  "num_graphs": 5,
+  "iters_per_graph": 8,
+  "results_per_size": [
+    [
+      { "valid_cliques": 7, "k_cliques": 6, "found_solution": true },
+      { "valid_cliques": 8, "k_cliques": 7, "found_solution": true },
+      { "valid_cliques": 7, "k_cliques": 5, "found_solution": true },
+      { "valid_cliques": 6, "k_cliques": 4, "found_solution": true },
+      { "valid_cliques": 8, "k_cliques": 4, "found_solution": true }
+    ],
+    [
+      { "valid_cliques": 8, "k_cliques": 8, "found_solution": true },
+      { "valid_cliques": 8, "k_cliques": 5, "found_solution": true },
+      { "valid_cliques": 5, "k_cliques": 5, "found_solution": true },
+      { "valid_cliques": 3, "k_cliques": 2, "found_solution": true },
+      { "valid_cliques": 3, "k_cliques": 2, "found_solution": true }
+    ],
+    [
+      { "valid_cliques": 2, "k_cliques": 2, "found_solution": true },
+      { "valid_cliques": 8, "k_cliques": 7, "found_solution": true },
+      { "valid_cliques": 7, "k_cliques": 0, "found_solution": false },
+      { "valid_cliques": 4, "k_cliques": 2, "found_solution": true },
+      { "valid_cliques": 3, "k_cliques": 3, "found_solution": true }
+    ]
+  ],
+  "depths_per_size": [
+    [78.0, 72.0, 88.0, 94.0, 82.0],
+    [80.0, 72.0, 60.0, 60.0, 74.0],
+    [38.0, 54.0, 46.0, 58.0, 30.0]
+  ],
+  "evaluations_per_size": [
+    [136.25, 125.75, 111.125, 90.625, 141.125],
+    [137.625, 134.25, 134.875, 127.0, 104.5],
+    [158.875, 140.5, 156.75, 125.625, 158.75]
+  ]
+}
