@@ -1,3 +1,5 @@
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
 import numpy as np
 from matplotlib import pyplot as plt
 import networkx as nx
@@ -21,10 +23,10 @@ def qa_max_clique_bqm(graph, problem_size):
 
 def qa_k_clique_bqm(graph: nx.Graph, problem_size):
     k = problem_size["k"]
-    A = k + 1
-    B = 1
+    A = 1
+    B = k
 
-    x = {i: Binary(str(i)) for i in graph.nodes}
+    x = {i: Binary(i) for i in graph.nodes}
     complement_graph = nx.complement(graph)
 
     size = sum(x[i] for i in graph.nodes)
@@ -35,52 +37,59 @@ def qa_k_clique_bqm(graph: nx.Graph, problem_size):
     return hamiltonian
 
 
-def test_graph_qa(graph, problem, validate_solutions, iters=10):
+def test_graph_qa(graph, problem, validate_solutions, problem_size, iters=10, use_noisy_sampler=False):
+    bqm = problem(graph, problem_size)
 
-    # clique_percent_local = []
-    # max_clique_percent_local = []
+    sampler = PathIntegralAnnealingSampler() if use_noisy_sampler else SimulatedAnnealingSampler()
+
+    sampleset = sampler.sample(bqm, num_reads=iters)
+
+    node_order = list(graph.nodes)
     solutions = []
-    for i in range(iters):
-        
-        bqm = problem(graph)
-        # sampler = SimulatedAnnealingSampler()
-        sampler = PathIntegralAnnealingSampler()
-        num_reads = 2
-        sampleset = sampler.sample(bqm, num_reads=num_reads)
-        # energies = np.array([s[1] for s in sampleset.record]) #  if is_clique(graph, s[0]) je do zdej blo vedno true
-        # clique_sizes = [sum(r[0]) for r in sampleset.record] #  if is_clique(graph, s[0]) je do zdej blo vedno true
-        # successful_runs = energies.shape[0]
-        # clique_percent_local.append(successful_runs / num_reads)
-        # unique, counts = np.unique(clique_sizes, return_counts=True)
-        # exact_sampler = SimulatedAnnealingSampler()
-        # exact_sampleset = exact_sampler.sample(bqm, num_reads=50)
-        # print(exact_sampleset)
-        solution = sampleset.lowest().record[0][0]
-        solutions.append(solution)
+    for sample in sampleset.samples():
+        bitstring = [sample[node] for node in node_order]
+        solutions.append(bitstring)
 
-        # exact_max_clique = sum(solution)
-        # max_clique_percent_local.append(np.sum(np.array(clique_sizes) == np.full_like(clique_sizes, exact_max_clique)) / num_reads)
-        # print(f"Exact solution: {exact_max_clique}")
-        # max_cliques_found.append()
     validation_results = validate_solutions(solutions)
     return validation_results
 
-def test_problem_sizes_qa(sizes, generate_instance, instance_count, problem, validate_solutions, iters=None):
+def qa_graph_worker(args):
+    graph, problem_size, problem, validate_solutions, iters, use_noise = args
+
+    return test_graph_qa(
+        graph=graph,
+        problem=problem,
+        validate_solutions=lambda bitstrings: validate_solutions(graph, bitstrings, problem_size),
+        problem_size=problem_size,
+        iters=iters if iters is not None else problem_size["iters_per_graph"],
+        use_noisy_sampler=use_noise
+    )
+
+def test_problem_sizes_qa(sizes, generate_instance, instance_count, problem, validate_solutions, iters=None, max_workers=4, use_noise=False):
     validation_results_per_size = []
+
     for s in sizes:
         print(f"--- Problem size: {s}")
-        graphs = [generate_instance(s) for i in range(instance_count)]
+
+        graphs = [generate_instance(s) for _ in range(instance_count)]
+
+        args = [
+            (graph, s, problem, validate_solutions, iters, use_noise)
+            for graph in graphs
+        ]
+
         validation_results_for_graphs = []
-        for graph in tqdm(graphs):
-            validation_results = test_graph_qa(
-                graph, 
-                problem=lambda g: problem(g, s),
-                validate_solutions=lambda x: validate_solutions(graph, x, s),
-                iters=iters if iters != None else s["iters_per_graph"]
-            )
-            
-            validation_results_for_graphs.append(validation_results)
-            
+
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(qa_graph_worker, arg)
+                for arg in args
+            ]
+
+            for future in tqdm(as_completed(futures), total=len(futures)):
+                validation_results = future.result()
+                validation_results_for_graphs.append(validation_results)
+
         validation_results_per_size.append(validation_results_for_graphs)
-        
+
     return validation_results_per_size

@@ -27,19 +27,28 @@ def generate_k_clique_instance(size_info):
 def generate_max_clique_instance(size_info):
     return generate_graph_with_k_clique(size_info["n"], size_info["p"], size_info["k"])
 
-def validate_max_clique_solutions(graph, solutions, k):
-    return validate_k_clique_solutions(graph, solutions, k)
+def generate_random_graph_instance(size_info):
+    return nx.erdos_renyi_graph(size_info["n"], size_info["p"])
+
+def validate_max_clique_solutions(graph, solutions):
+    max_clique_nodes = max(nx.algorithms.clique.find_cliques(graph), key = len)
+    # print(len(max_clique_nodes))
+    return validate_k_clique_solutions(graph, solutions, len(max_clique_nodes))
 
 def validate_k_clique_solutions(graph, solutions, k):
     valid_cliques = 0
     k_cliques = 0
+    is_size_k = 0
     for solution in solutions:
         is_valid = is_clique(graph, solution)
         is_k_clique = sum(solution) == k and is_valid
         valid_cliques += 1 if is_valid else 0
         k_cliques += 1 if is_k_clique else 0
+        is_size_k += 1 if sum(solution) == k else 0
+
     return {
         "valid_cliques": valid_cliques,
+        "is_size_k": is_size_k,
         "k_cliques": k_cliques,
         "found_solution": k_cliques > 0
     }
@@ -58,3 +67,7 @@ def is_clique(graph: nx.Graph, solution):
 
 def er_max_clique_size(n, p):
     return float(np.floor(2*np.log(n)/np.log(1/p)))
+
+if __name__ == "__main__":
+
+    print(er_max_clique_size(10, 0.4))

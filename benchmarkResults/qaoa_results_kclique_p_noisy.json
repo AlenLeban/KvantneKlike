@@ -1,0 +1,535 @@
+{
+  "problem_sizes": [
+    { "n": 7, "p": 0.1, "k": 3, "iters_per_graph": 1, "layers": 1 },
+    { "n": 7, "p": 0.3, "k": 3, "iters_per_graph": 1, "layers": 1 },
+    { "n": 7, "p": 0.5, "k": 3, "iters_per_graph": 1, "layers": 1 },
+    { "n": 7, "p": 0.7, "k": 3, "iters_per_graph": 1, "layers": 1 }
+  ],
+  "num_graphs": 20,
+  "results_per_size": [
+    [
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 1,
+        "k_cliques": 1,
+        "found_solution": true
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 1,
+        "k_cliques": 1,
+        "found_solution": true
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      }
+    ],
+    [
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 1,
+        "k_cliques": 1,
+        "found_solution": true
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      }
+    ],
+    [
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 1,
+        "k_cliques": 1,
+        "found_solution": true
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 1,
+        "k_cliques": 1,
+        "found_solution": true
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 1,
+        "k_cliques": 1,
+        "found_solution": true
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      }
+    ],
+    [
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 1,
+        "k_cliques": 1,
+        "found_solution": true
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 1,
+        "k_cliques": 1,
+        "found_solution": true
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 1,
+        "k_cliques": 1,
+        "found_solution": true
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 1,
+        "is_size_k": 0,
+        "k_cliques": 0,
+        "found_solution": false
+      },
+      {
+        "valid_cliques": 0,
+        "is_size_k": 1,
+        "k_cliques": 0,
+        "found_solution": false
+      }
+    ]
+  ],
+  "depths_per_size": [
+    [
+      222.0, 290.0, 241.0, 274.0, 273.0, 248.0, 217.0, 223.0, 236.0, 272.0,
+      227.0, 273.0, 227.0, 227.0, 274.0, 272.0, 274.0, 272.0, 272.0, 272.0
+    ],
+    [
+      272.0, 274.0, 274.0, 274.0, 272.0, 236.0, 227.0, 272.0, 228.0, 228.0,
+      228.0, 274.0, 223.0, 227.0, 223.0, 272.0, 273.0, 274.0, 217.0, 273.0
+    ],
+    [
+      272.0, 237.0, 227.0, 273.0, 272.0, 227.0, 273.0, 227.0, 272.0, 223.0,
+      274.0, 274.0, 272.0, 228.0, 272.0, 228.0, 228.0, 274.0, 272.0, 273.0
+    ],
+    [
+      227.0, 272.0, 272.0, 272.0, 272.0, 274.0, 272.0, 210.0, 273.0, 272.0,
+      274.0, 274.0, 274.0, 272.0, 272.0, 210.0, 297.0, 272.0, 273.0, 274.0
+    ]
+  ],
+  "evaluations_per_size": [
+    [
+      15.0, 15.0, 17.0, 16.0, 16.0, 17.0, 18.0, 18.0, 19.0, 19.0, 16.0, 17.0,
+      16.0, 20.0, 19.0, 20.0, 18.0, 20.0, 22.0, 29.0
+    ],
+    [
+      14.0, 14.0, 15.0, 15.0, 15.0, 15.0, 15.0, 18.0, 20.0, 23.0, 15.0, 15.0,
+      15.0, 18.0, 18.0, 19.0, 18.0, 17.0, 20.0, 18.0
+    ],
+    [
+      16.0, 16.0, 17.0, 17.0, 18.0, 18.0, 20.0, 19.0, 22.0, 23.0, 14.0, 16.0,
+      16.0, 16.0, 22.0, 19.0, 19.0, 18.0, 20.0, 29.0
+    ],
+    [
+      15.0, 15.0, 17.0, 18.0, 19.0, 18.0, 19.0, 20.0, 21.0, 26.0, 17.0, 16.0,
+      17.0, 18.0, 21.0, 16.0, 19.0, 17.0, 18.0, 16.0
+    ]
+  ]
+}

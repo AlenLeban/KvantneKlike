@@ -1,3 +1,5 @@
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
 import numpy as np
 from matplotlib import pyplot as plt
 from qiskit_ibm_runtime import QiskitRuntimeService
@@ -11,11 +13,11 @@ import json
 from scipy.optimize import minimize
 from qiskit_aer import AerSimulator
 from qiskit.primitives import StatevectorEstimator
-
+from multiprocessing import Pool
 from tqdm import tqdm
+from qiskit_ibm_runtime.fake_provider import FakeBrisbane
 
 from utils import to_bitstring
-
 
 
 def build_maxcut_paulis(graph: nx.Graph):
@@ -110,11 +112,24 @@ def cost_func_estimator(params, ansatz, hamiltonian, estimator):
 
     return cost
 
-def test_graph_qaoa(graph, problem, validate_solutions, iters=5, num_layers=3):
+def test_graph_qaoa(graph, problem, validate_solutions, iters=5, num_layers=2, use_noisy_optimizer=False, use_noisy_sampling=False):
 
     validation_results = []
-    estimator = StatevectorEstimator()
-    backend = AerSimulator()
+    # exc = ThreadPoolExecutor(max_workers=2)
+    if use_noisy_optimizer:
+        backend = AerSimulator.from_backend(FakeBrisbane())
+        estimator = Estimator(mode=backend)
+    else:
+        backend = AerSimulator()
+        estimator = StatevectorEstimator()
+    backend.set_options(statevector_parallel_threshold=100)
+    # backend.set_options(executor=exc)
+    # backend.set_options(
+    #     max_parallel_threads = 0,
+    #     max_parallel_experiments = 0,
+    #     max_parallel_shots = 1,
+    #     statevector_parallel_threshold = 16
+    # )
     sampler = Sampler(mode=backend)
     sampler.options.default_shots = 1000
     pm = generate_preset_pass_manager(optimization_level=3, backend=backend)
@@ -140,7 +155,7 @@ def test_graph_qaoa(graph, problem, validate_solutions, iters=5, num_layers=3):
             initial_params,
             args=(candidate_circuit_no_meas, cost_hamiltonian, estimator),
             method="COBYLA",
-            options={"maxiter": 200},
+            # options={"maxiter": 200},
             tol=1e-2
         )
         # print(f"Energy: {cost_func_estimator(result.x, candidate_circuit_no_meas, cost_hamiltonian, estimator)}")
@@ -150,6 +165,7 @@ def test_graph_qaoa(graph, problem, validate_solutions, iters=5, num_layers=3):
         optimized_circuits.append(optimized_circuit)
 
     # pub = (optimized_circuit, )
+
     job = sampler.run(optimized_circuits, shots=1000)
     for res in job.result():
         counts_int = res.data.meas.get_int_counts()
@@ -172,30 +188,62 @@ def test_graph_qaoa(graph, problem, validate_solutions, iters=5, num_layers=3):
     avg_number_evaluations /= iters
     return validation_results, average_opimized_circuit_depth, avg_number_evaluations
 
-def test_problem_sizes_qaoa(sizes, generate_instance, instance_count, problem, validate_solutions, layers=4, iters=None):
+def _qaoa_graph_worker(args):
+    graph, s, problem, validate_solutions, layers, iters, use_noisy_optimizer = args
+
+    return test_graph_qaoa(
+        graph,
+        problem=lambda g: problem(g, s),
+        validate_solutions=lambda bitstrings: validate_solutions(graph, bitstrings, s),
+        iters=iters if iters is not None else s["iters_per_graph"],
+        num_layers=layers if layers is not None else s["layers"],
+        use_noisy_optimizer=use_noisy_optimizer
+    )
+
+def test_problem_sizes_qaoa(
+    sizes,
+    generate_instance,
+    instance_count,
+    problem,
+    validate_solutions,
+    layers=4,
+    iters=None,
+    max_workers=None,
+    use_noisy_optimizer=False
+):
     validation_results_per_size = []
     depths_per_size = []
     evaluations_per_size = []
+
     for s in sizes:
         print(f"--- Problem size: {s}")
-        graphs = [generate_instance(s) for i in range(instance_count)]
+
+        graphs = [generate_instance(s) for _ in range(instance_count)]
+
+        worker_args = [
+            (graph, s, problem, validate_solutions, layers, iters, use_noisy_optimizer)
+            for graph in graphs
+        ]
+
         validation_results_for_graphs = []
-        evaluations_per_graph = []
         depths_per_graph = []
-        for graph in tqdm(graphs):
-            validation_results, optimized_circuit_depth, avg_num_evaluations = test_graph_qaoa(
-                graph, 
-                problem=lambda x: problem(x, s), 
-                validate_solutions=lambda x: validate_solutions(graph, x, s),
-                iters=iters if iters != None else s["iters_per_graph"], 
-                num_layers=layers if layers != None else s["layers"])
-            
-            validation_results_for_graphs.append(validation_results)
-            evaluations_per_graph.append(avg_num_evaluations)
-            depths_per_graph.append(optimized_circuit_depth)
-            
+        evaluations_per_graph = []
+
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(_qaoa_graph_worker, args)
+                for args in worker_args
+            ]
+
+            for future in tqdm(as_completed(futures), total=len(futures)):
+                validation_results, optimized_circuit_depth, avg_num_evaluations = future.result()
+
+                validation_results_for_graphs.append(validation_results)
+                depths_per_graph.append(optimized_circuit_depth)
+                evaluations_per_graph.append(avg_num_evaluations)
+
         validation_results_per_size.append(validation_results_for_graphs)
         depths_per_size.append(depths_per_graph)
         evaluations_per_size.append(evaluations_per_graph)
-        
+
     return validation_results_per_size, depths_per_size, evaluations_per_size
