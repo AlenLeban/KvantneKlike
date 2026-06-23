@@ -13,7 +13,8 @@ from dimod import Binary, ExactSolver
 from dwave.samplers import PathIntegralAnnealingSampler
 from tqdm import tqdm
 
-def qa_max_clique_bqm(graph, problem_size):
+def qa_max_clique_bqm(problem_instance, problem_size):
+    graph = problem_instance["graph"]
     x = {i : Binary(i) for i in graph.nodes}
     complement_graph = nx.complement(graph)
     terms = [-x[i] for i in complement_graph.nodes]
@@ -21,8 +22,9 @@ def qa_max_clique_bqm(graph, problem_size):
     bqm = sum(terms)
     return bqm
 
-def qa_k_clique_bqm(graph: nx.Graph, problem_size):
-    k = problem_size["k"]
+def qa_k_clique_bqm(problem_instance, problem_size):
+    graph = problem_instance["graph"]
+    k = problem_instance["k"]
     A = 1
     B = k
 
@@ -37,9 +39,10 @@ def qa_k_clique_bqm(graph: nx.Graph, problem_size):
     return hamiltonian
 
 
-def test_graph_qa(graph, problem, validate_solutions, problem_size, iters=10, use_noisy_sampler=False):
-    bqm = problem(graph, problem_size)
+def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, iters=10, use_noisy_sampler=False):
 
+    bqm = problem(problem_instance, problem_size)
+    graph = problem_instance["graph"]
     sampler = PathIntegralAnnealingSampler() if use_noisy_sampler else SimulatedAnnealingSampler()
 
     sampleset = sampler.sample(bqm, num_reads=iters)
@@ -54,12 +57,12 @@ def test_graph_qa(graph, problem, validate_solutions, problem_size, iters=10, us
     return validation_results
 
 def qa_graph_worker(args):
-    graph, problem_size, problem, validate_solutions, iters, use_noise = args
+    problem_instance, problem_size, problem, validate_solutions, iters, use_noise = args
 
     return test_graph_qa(
-        graph=graph,
+        problem_instance=problem_instance,
         problem=problem,
-        validate_solutions=lambda bitstrings: validate_solutions(graph, bitstrings, problem_size),
+        validate_solutions=lambda bitstrings: validate_solutions(problem_instance, bitstrings, problem_size),
         problem_size=problem_size,
         iters=iters if iters is not None else problem_size["iters_per_graph"],
         use_noisy_sampler=use_noise
@@ -71,11 +74,11 @@ def test_problem_sizes_qa(sizes, generate_instance, instance_count, problem, val
     for s in sizes:
         print(f"--- Problem size: {s}")
 
-        graphs = [generate_instance(s) for _ in range(instance_count)]
+        problem_instances = [generate_instance(s) for _ in range(instance_count)]
 
         args = [
-            (graph, s, problem, validate_solutions, iters, use_noise)
-            for graph in graphs
+            (problem_instance, s, problem, validate_solutions, iters, use_noise)
+            for problem_instance in problem_instances
         ]
 
         validation_results_for_graphs = []

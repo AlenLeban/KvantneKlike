@@ -27,7 +27,8 @@ def build_maxcut_paulis(graph: nx.Graph):
         pauli_list.append(("ZZ", [e[0], e[1]], 1))
     return pauli_list
 
-def build_maxclique_mis_paulis(graph: nx.Graph, problem_size):
+def build_maxclique_mis_paulis(problem_instance):
+    graph = problem_instance["graph"]
     complement = nx.complement(graph)
     # solve max independent set
     pauli_list = []
@@ -44,8 +45,10 @@ def build_maxclique_mis_paulis(graph: nx.Graph, problem_size):
         
     return pauli_list
 
-def build_kclique_paulis(graph, k):
+def build_kclique_paulis(problem_instance):
     
+    graph = problem_instance["graph"]
+    k = problem_instance["k"]
     pauli_list = []
     B = 1
     A = B*k + 1
@@ -71,11 +74,12 @@ def build_kclique_paulis(graph, k):
         pauli_list.append((pauli, list(qubits), coeff))
     return pauli_list
 
-def build_kclique_paulis_mis(graph, problem_size):
+def build_kclique_paulis_mis(problem_instance):
     
+    graph = problem_instance["graph"]
+    k = problem_instance["k"]
     complement = nx.complement(graph)
     pauli_list = []
-    k = problem_size["k"]
     B = 1
     A = B*k + 1
     observable_dict = dict()
@@ -112,7 +116,7 @@ def cost_func_estimator(params, ansatz, hamiltonian, estimator):
 
     return cost
 
-def test_graph_qaoa(graph, problem, validate_solutions, iters=5, num_layers=2, use_noisy_optimizer=False, use_noisy_sampling=False):
+def test_graph_qaoa(problem_instance, problem, validate_solutions, iters=5, num_layers=2, use_noisy_optimizer=False, use_noisy_sampling=False):
 
     validation_results = []
     # exc = ThreadPoolExecutor(max_workers=2)
@@ -133,7 +137,8 @@ def test_graph_qaoa(graph, problem, validate_solutions, iters=5, num_layers=2, u
     sampler = Sampler(mode=backend)
     sampler.options.default_shots = 1000
     pm = generate_preset_pass_manager(optimization_level=3, backend=backend)
-    paulis = problem(graph)
+    paulis = problem(problem_instance)
+    graph = problem_instance["graph"]
     cost_hamiltonian = SparsePauliOp.from_sparse_list(paulis, graph.number_of_nodes())
 
     circuit = QAOAAnsatz(cost_operator=cost_hamiltonian, reps=num_layers)
@@ -189,12 +194,12 @@ def test_graph_qaoa(graph, problem, validate_solutions, iters=5, num_layers=2, u
     return validation_results, average_opimized_circuit_depth, avg_number_evaluations
 
 def _qaoa_graph_worker(args):
-    graph, s, problem, validate_solutions, layers, iters, use_noisy_optimizer = args
+    problem_instance, s, problem, validate_solutions, layers, iters, use_noisy_optimizer = args
 
     return test_graph_qaoa(
-        graph,
-        problem=lambda g: problem(g, s),
-        validate_solutions=lambda bitstrings: validate_solutions(graph, bitstrings, s),
+        problem_instance,
+        problem=problem,
+        validate_solutions=lambda bitstrings: validate_solutions(problem_instance, bitstrings, s),
         iters=iters if iters is not None else s["iters_per_graph"],
         num_layers=layers if layers is not None else s["layers"],
         use_noisy_optimizer=use_noisy_optimizer
@@ -209,7 +214,8 @@ def test_problem_sizes_qaoa(
     layers=4,
     iters=None,
     max_workers=None,
-    use_noisy_optimizer=False
+    use_noisy_optimizer=False,
+    intermediate_results_callback=None
 ):
     validation_results_per_size = []
     depths_per_size = []
@@ -218,11 +224,11 @@ def test_problem_sizes_qaoa(
     for s in sizes:
         print(f"--- Problem size: {s}")
 
-        graphs = [generate_instance(s) for _ in range(instance_count)]
+        problem_instances = [generate_instance(s) for _ in range(instance_count)]
 
         worker_args = [
-            (graph, s, problem, validate_solutions, layers, iters, use_noisy_optimizer)
-            for graph in graphs
+            (problem_instance, s, problem, validate_solutions, layers, iters, use_noisy_optimizer)
+            for problem_instance in problem_instances
         ]
 
         validation_results_for_graphs = []
@@ -245,5 +251,7 @@ def test_problem_sizes_qaoa(
         validation_results_per_size.append(validation_results_for_graphs)
         depths_per_size.append(depths_per_graph)
         evaluations_per_size.append(evaluations_per_graph)
+        if intermediate_results_callback:
+            intermediate_results_callback(validation_results_per_size, depths_per_size, evaluations_per_size)
 
     return validation_results_per_size, depths_per_size, evaluations_per_size
