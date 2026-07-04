@@ -45,6 +45,11 @@ def is_k_clique_oracle(graph, k):
             ancilla_qubit = q_edge_ancilla[pair_to_edge_offset[(n1, n2)]]
             qc.mcx([n1, n2], ancilla_qubit)
 
+    # check clique violations
+    qc.x(q_edge_ancilla)
+    qc.mcx(q_edge_ancilla, q_isclique, ancilla_qubits=q_mcx_ancilla)
+
+    qc.barrier()
     # count vertices
     for v in range(n):
         for i in reversed(range(1, len(q_size))):
@@ -53,10 +58,7 @@ def is_k_clique_oracle(graph, k):
 
     # check if vertex count is k
     qc.mcx(q_size, q_isk, ctrl_state=format(k, f'0{len(q_size)}b'))
-
-    # check clique violations
-    qc.x(q_edge_ancilla)
-    qc.mcx(q_edge_ancilla, q_isclique, ancilla_qubits=q_mcx_ancilla, mode="v-chain")
+    qc.barrier()
 
     qc.x(q_ans)
     qc.h(q_ans)
@@ -64,17 +66,22 @@ def is_k_clique_oracle(graph, k):
     qc.h(q_ans)
     qc.x(q_ans)
 
+    qc.barrier()
     # uncompute
 
     # qc.mcx(q_edge_ancilla, q_isclique)
-    
-    qc.x(q_edge_ancilla)
+
     qc.mcx(q_size, q_isk, ctrl_state=format(k, f'0{len(q_size)}b'))
+
 
     for v in reversed(range(n)):
         qc.cx(q_verts[v], q_size[0])
         for i in range(1, len(q_size)):
             qc.mcx([q_verts[v]] + list(q_size[:i]), q_size[i])
+
+
+    qc.mcx(q_edge_ancilla, q_isclique, ancilla_qubits=q_mcx_ancilla)
+    qc.x(q_edge_ancilla)
 
     for n1 in reversed(list(graph.nodes())):
         for n2 in reversed(list(graph.nodes())):
@@ -94,6 +101,14 @@ def is_k_clique_oracle(graph, k):
 
     return qc
 
+
+
+
+
+
+
+
+
 if __name__ == "__main__":
     test_graph = nx.Graph()
     test_graph.add_nodes_from([0, 1, 2])
@@ -101,23 +116,22 @@ if __name__ == "__main__":
 
     circuit = is_k_clique_oracle(test_graph, 3)
 
-    grover_circuit_iter = grover_operator(circuit, reflection_qubits=list(range(4)))
+    grover_circuit_iter = grover_operator(circuit, reflection_qubits=list(range(test_graph.number_of_nodes())))
     # grover_circuit_iter.draw("mpl")
 
-    iterations = 2
+    iterations = 1
     grover_circuit = QuantumCircuit(grover_circuit_iter.num_qubits, test_graph.number_of_nodes())
     grover_circuit.h(range(test_graph.number_of_nodes()))
     grover_circuit.compose(grover_circuit_iter.power(iterations), inplace=True)
     grover_circuit.measure(range(test_graph.number_of_nodes()), range(test_graph.number_of_nodes()))
-    # grover_circuit.draw("mpl")
 
     grover_circuit_t = transpile(grover_circuit, basis_gates=["rz", "sx", "cx"])
     print(f"Transpiled depth: {grover_circuit_t.depth()}")
-    # circuit.draw("mpl", scale=1, fold=50, interactive=True)
-    # plt.show()
+    circuit.draw("mpl", scale=1, fold=50)
+    plt.savefig("Figures/grover_circuit_test.png")
     # print(grover_circuit.num_qubits)
 
-    grover_use_simulator = True
+    grover_use_simulator = False
     if not grover_use_simulator:
         service = QiskitRuntimeService()
 
@@ -164,10 +178,11 @@ if __name__ == "__main__":
     positions = []
     for value in top_4_values:
         positions.append(np.where(values == value)[0])
-    fig = plt.figure(figsize=(11, 6))
+    fig = plt.figure(figsize=(3, 6))
     ax = fig.add_subplot(1, 1, 1)
+    fig.subplots_adjust(left=0.2)
     plt.xticks(rotation=90)
-    plt.title("Result Distribution")
+    plt.title("Real backend")
     plt.xlabel("Bitstrings (reversed)")
     plt.ylabel("Probability")
     ax.bar(list(final_bits.keys()), list(final_bits.values()), color="tab:grey")

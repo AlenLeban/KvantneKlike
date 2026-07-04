@@ -13,12 +13,15 @@ from dimod import Binary, ExactSolver
 from dwave.samplers import PathIntegralAnnealingSampler
 from tqdm import tqdm
 
+from utils import is_number
+
 def qa_max_clique_bqm(problem_instance, problem_size):
     graph = problem_instance["graph"]
     x = {i : Binary(i) for i in graph.nodes}
     complement_graph = nx.complement(graph)
     terms = [-x[i] for i in complement_graph.nodes]
-    terms += [2*x[i]*x[j] for i,j in complement_graph.edges]
+    B = 1.1 if "B" not in problem_size else problem_size["B"]
+    terms += [B*x[i]*x[j] for i,j in complement_graph.edges]
     bqm = sum(terms)
     return bqm
 
@@ -26,8 +29,13 @@ def qa_k_clique_bqm(problem_instance, problem_size):
     graph = problem_instance["graph"]
     k = problem_instance["k"]
     A = 1
-    B = k
-
+    if "B" in problem_size:
+        if problem_size["B"] == "k":
+            B = k
+        elif is_number(problem_size["B"]):
+            B = float(problem_size["B"])
+    else:
+        B = 1
     x = {i: Binary(i) for i in graph.nodes}
     complement_graph = nx.complement(graph)
 

@@ -4,6 +4,13 @@ import random
 import numpy as np
 import networkx as nx
 
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
 def to_bitstring(integer, num_bits):
     result = np.binary_repr(integer, width=num_bits)
     return [int(digit) for digit in result]

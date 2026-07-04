@@ -109,7 +109,7 @@ def benchmark_problem_sizes(problem_sizes, output_filename, problem, validate_so
                                 problem=problem, 
                                 validate_solutions=validate_solutions,
                                 iters=iters,
-                                max_workers=10,
+                                max_workers=5,
                                 use_noise=use_noise
                                 )
         if append_graphs:
