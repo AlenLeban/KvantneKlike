@@ -3,7 +3,7 @@ import numpy as np
 from annealing import qa_k_clique_bqm, qa_max_clique_bqm
 from benchmark import benchmark_problem_sizes, helper_validate_k_clique_solutions, helper_validate_max_clique_solutions
 from qaoa import build_maxclique_mis_paulis
-from utils import er_max_clique_size, generate_k_clique_instance, generate_random_graph_instance
+from utils import er_max_clique_size, generate_config_model_graph_instance, generate_k_clique_instance, generate_kcore_graph_instance, generate_random_graph_instance
 
 
 if __name__ == "__main__":
@@ -25,30 +25,30 @@ if __name__ == "__main__":
     # )
 
     # test qaoa on findinig k-clique, different iters per graph
-    benchmark_problem_sizes(
-        [ {"n": n, "p": 0.4, "k": int(er_max_clique_size(n, 0.4)-1), "iters_per_graph" : iters} for iters in range(1, 22, 4) for n in range(6, 200, 50)],
-        "qa_results_kclique_iters_n.json",
-        problem=qa_k_clique_bqm,
-        validate_solutions=helper_validate_k_clique_solutions,
-        instance_generator=generate_k_clique_instance,
-        num_graphs=100,
-        method="QA",
-        use_noise=False,
-        append_graphs=True
-    )
+    # benchmark_problem_sizes(
+    #     [ {"n": n, "p": 0.4, "k": int(er_max_clique_size(n, 0.4)-1), "iters_per_graph" : iters} for iters in range(1, 22, 4) for n in range(6, 200, 50)],
+    #     "qa_results_kclique_iters_n.json",
+    #     problem=qa_k_clique_bqm,
+    #     validate_solutions=helper_validate_k_clique_solutions,
+    #     instance_generator=generate_k_clique_instance,
+    #     num_graphs=100,
+    #     method="QA",
+    #     use_noise=False,
+    #     append_graphs=True
+    # )
 
-    # test qaoa on findinig k-clique, different iters per graph NOISY
-    benchmark_problem_sizes(
-        [ {"n": n, "p": 0.4, "k": int(er_max_clique_size(n, 0.4)-1), "iters_per_graph" : iters} for iters in range(1, 22, 4) for n in range(6, 200, 50)],
-        "qa_results_kclique_iters_n_noisy.json",
-        problem=qa_k_clique_bqm,
-        validate_solutions=helper_validate_k_clique_solutions,
-        instance_generator=generate_k_clique_instance,
-        num_graphs=100,
-        method="QA",
-        use_noise=True,
-        append_graphs=True
-    )
+    # # test qaoa on findinig k-clique, different iters per graph NOISY
+    # benchmark_problem_sizes(
+    #     [ {"n": n, "p": 0.4, "k": int(er_max_clique_size(n, 0.4)-1), "iters_per_graph" : iters} for iters in range(1, 22, 4) for n in range(6, 200, 50)],
+    #     "qa_results_kclique_iters_n_noisy.json",
+    #     problem=qa_k_clique_bqm,
+    #     validate_solutions=helper_validate_k_clique_solutions,
+    #     instance_generator=generate_k_clique_instance,
+    #     num_graphs=100,
+    #     method="QA",
+    #     use_noise=True,
+    #     append_graphs=True
+    # )
 
     # test qaoa on finding k-clique, different num layers per graph size
     # benchmark_problem_sizes(
@@ -199,6 +199,30 @@ if __name__ == "__main__":
     #     num_graphs=10,
     #     method="QAOA",
     #     append_graphs=True
+    # )
+
+    # test qa on findinig max-clique, different n on graphs with k-core one less that largest clique
+    benchmark_problem_sizes(
+        [ {"n": n, "k": int(n*0.4), "iters_per_graph" : 1} for n in range(6, 160, 20)],
+        "qa_results_maxclique_config_n.json",
+        problem=qa_max_clique_bqm,
+        validate_solutions=helper_validate_max_clique_solutions,
+        instance_generator=generate_config_model_graph_instance,
+        num_graphs=200,
+        method="QA",
+        append_graphs=False,
+        use_noise=False,
+    )
+    # benchmark_problem_sizes(
+    #     [ {"n": n, "p": 0.4, "k": None, "iters_per_graph" : 1} for n in range(6, 200, 20)],
+    #     "qa_results_maxclique_random_n.json",
+    #     problem=qa_max_clique_bqm,
+    #     validate_solutions=helper_validate_max_clique_solutions,
+    #     instance_generator=generate_random_graph_instance,
+    #     num_graphs=200,
+    #     method="QA",
+    #     append_graphs=False,
+    #     use_noise=False,
     # )
 
     pass

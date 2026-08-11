@@ -5,13 +5,13 @@ from matplotlib import pyplot as plt
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit_ibm_runtime import Session, Batch, EstimatorV2 as Estimator
 from qiskit_ibm_runtime import SamplerV2 as Sampler
-from qiskit.quantum_info import SparsePauliOp
+from qiskit.quantum_info import SparsePauliOp, Statevector
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit.circuit.library import QAOAAnsatz
 import networkx as nx
 import json
 from scipy.optimize import minimize
-from qiskit_aer import AerSimulator
+from qiskit_aer import Aer, AerSimulator
 from qiskit.primitives import StatevectorEstimator
 from multiprocessing import Pool
 from tqdm import tqdm
@@ -116,9 +116,8 @@ def cost_func_estimator(params, ansatz, hamiltonian, estimator):
 
     return cost
 
-def test_graph_qaoa(problem_instance, problem, validate_solutions, iters=5, num_layers=2, use_noisy_optimizer=False, use_noisy_sampling=False):
+def quick_run_qaoa(problem_instance, problem, iters=5, num_layers=2, use_noisy_optimizer=False, use_noisy_sampling=False, ansatz_circuit=QAOAAnsatz, num_shots=1000, return_statevectors=False):
 
-    validation_results = []
     # exc = ThreadPoolExecutor(max_workers=2)
     if use_noisy_optimizer:
         backend = AerSimulator.from_backend(FakeBrisbane())
@@ -135,26 +134,25 @@ def test_graph_qaoa(problem_instance, problem, validate_solutions, iters=5, num_
     #     statevector_parallel_threshold = 16
     # )
     sampler = Sampler(mode=backend)
-    sampler.options.default_shots = 1000
+    sampler.options.default_shots = num_shots
     pm = generate_preset_pass_manager(optimization_level=3, backend=backend)
     paulis = problem(problem_instance)
     graph = problem_instance["graph"]
     cost_hamiltonian = SparsePauliOp.from_sparse_list(paulis, graph.number_of_nodes())
 
-    circuit = QAOAAnsatz(cost_operator=cost_hamiltonian, reps=num_layers)
+    circuit = ansatz_circuit(cost_hamiltonian, reps=num_layers)
+    circuit_no_meas = circuit.copy()
+    circuit_no_meas.remove_final_measurements()
     circuit.measure_all()
     candidate_circuit = pm.run(circuit)
     candidate_circuit_no_meas = candidate_circuit.remove_final_measurements(inplace=False)
-    found_bitstrings = []
     cumulative_optimized_circuit_depth = 0
     avg_number_evaluations = 0
     optimized_circuits = []
+    one_parameters = None
     for i in range(iters):
 
-
         initial_params = np.random.rand(2*num_layers) * 2 * np.pi
-
-
         result = minimize(
             cost_func_estimator,
             initial_params,
@@ -163,18 +161,43 @@ def test_graph_qaoa(problem_instance, problem, validate_solutions, iters=5, num_
             # options={"maxiter": 200},
             tol=1e-2
         )
+        one_parameters = result.x
         # print(f"Energy: {cost_func_estimator(result.x, candidate_circuit_no_meas, cost_hamiltonian, estimator)}")
         optimized_circuit = candidate_circuit.assign_parameters(result.x)
         cumulative_optimized_circuit_depth += optimized_circuit.depth()
         avg_number_evaluations += result.nfev
         optimized_circuits.append(optimized_circuit)
 
+
     # pub = (optimized_circuit, )
+    job = sampler.run(optimized_circuits, shots=num_shots)
+    if return_statevectors:
 
-    job = sampler.run(optimized_circuits, shots=1000)
-    for res in job.result():
+        c = circuit_no_meas.assign_parameters(one_parameters)
+
+        print("num_qubits:", c.num_qubits)
+        print("num_clbits:", c.num_clbits)
+        print("depth:", c.depth())
+        print("size:", c.size())
+        print(c)
+
+        print(c)
+        c.draw("mpl", fold=50, scale=0.5)
+        plt.show()
+        sv = Statevector(c)
+        return sv
+
+    return job.result(), cumulative_optimized_circuit_depth, avg_number_evaluations
+
+def test_graph_qaoa(problem_instance, problem, validate_solutions, iters=5, num_layers=2, use_noisy_optimizer=False, use_noisy_sampling=False, ansatz_circuit=QAOAAnsatz, num_shots=1000):
+
+    validation_results = []
+    graph = problem_instance["graph"]
+    results, cumulative_optimized_circuit_depth, avg_number_evaluations = quick_run_qaoa(problem_instance, problem, iters, num_layers, use_noisy_optimizer, use_noisy_sampling, ansatz_circuit, num_shots)
+    found_bitstrings = []
+    for res in results:
         counts_int = res.data.meas.get_int_counts()
-
+        print(counts_int)
         most_likely = max(counts_int, key=counts_int.get)
 
         most_likely_bitstring = to_bitstring(most_likely, graph.number_of_nodes())
@@ -189,9 +212,9 @@ def test_graph_qaoa(problem_instance, problem, validate_solutions, iters=5, num_
     # print(f"Valid cliques: {valid_cliques}/{iters}")
     # print(f"Valid k-cliques: {k_cliques}/{iters}")
 
-    average_opimized_circuit_depth = cumulative_optimized_circuit_depth / iters
+    average_optimized_circuit_depth = cumulative_optimized_circuit_depth / iters
     avg_number_evaluations /= iters
-    return validation_results, average_opimized_circuit_depth, avg_number_evaluations
+    return validation_results, average_optimized_circuit_depth, avg_number_evaluations
 
 def _qaoa_graph_worker(args):
     problem_instance, s, problem, validate_solutions, layers, iters, use_noisy_optimizer = args

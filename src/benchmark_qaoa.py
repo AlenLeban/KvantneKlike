@@ -137,18 +137,18 @@ if __name__ == "__main__":
     # )
 
     # test qaoa on finding max-clique, different p and n
-    benchmark_problem_sizes(
-        [ {"n": int(n), "p": float(round(p*1000)/1000), "k": None, "iters_per_graph" : 1, "layers": 1} for p in np.arange(0.1, 0.8, 0.1) for n in np.arange(6, 13, 2)],
-        "qaoa_results_maxclique_p_n.json",
-        problem=build_maxclique_mis_paulis,
-        validate_solutions=helper_validate_max_clique_solutions,
-        instance_generator=generate_random_graph_instance,
-        num_graphs=200,
-        method="QAOA",
-        append_graphs=True,
-        append_problem_sizes=False,
-        use_noise=False
-    )
+    # benchmark_problem_sizes(
+    #     [ {"n": int(n), "p": float(round(p*1000)/1000), "k": None, "iters_per_graph" : 1, "layers": 1} for p in np.arange(0.1, 0.8, 0.1) for n in np.arange(6, 13, 2)],
+    #     "qaoa_results_maxclique_p_n.json",
+    #     problem=build_maxclique_mis_paulis,
+    #     validate_solutions=helper_validate_max_clique_solutions,
+    #     instance_generator=generate_random_graph_instance,
+    #     num_graphs=200,
+    #     method="QAOA",
+    #     append_graphs=True,
+    #     append_problem_sizes=False,
+    #     use_noise=False
+    # )
 
     # test qaoa on finding max-clique, different p NOISY
     # benchmark_problem_sizes(
@@ -173,5 +173,6 @@ if __name__ == "__main__":
     #     method="QAOA",
     #     append_graphs=True
     # )
+
 
     pass

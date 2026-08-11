@@ -1,0 +1,4 @@
+Graph degeneracy: a graph is k-degenerate if every subgraph contains at least one vertex of degree at most k
+graph degeneracy number is the lowest k at which the graph is k-degenerate
+
+Graph clique number : size of the largest clique in the graph

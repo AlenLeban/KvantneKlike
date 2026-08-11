@@ -2,8 +2,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import numpy as np
 import scipy as sc
-from scipy.sparse import dok_matrix
-from scipy.sparse.linalg import eigs
+from scipy.sparse import csr_matrix, diags, dok_matrix, identity, kron
+from scipy.sparse.linalg import eigsh
 from matplotlib import pyplot as plt
 import networkx as nx
 import json
@@ -16,7 +16,7 @@ from dimod import Binary, ExactSolver
 from dwave.samplers import PathIntegralAnnealingSampler
 from tqdm import tqdm
 
-from utils import generate_graph_with_k_clique, is_number
+from utils import generate_graph_with_k_clique, generate_random_graph_instance, is_number
 
 def qa_max_clique_bqm(problem_instance, problem_size):
     graph = problem_instance["graph"]
@@ -108,81 +108,123 @@ def test_problem_sizes_qa(sizes, generate_instance, instance_count, problem, val
 
     return validation_results_per_size
 
-def build_initial_hamiltonian(n):
-    sx = np.array([[0, 1],
-                   [1, 0]], dtype=float)
-    I = np.eye(2)
+def build_initial_hamiltonian_sparse(n):
+    sx = csr_matrix([[0, 1],
+                     [1, 0]], dtype=float)
+    I = identity(2, format="csr", dtype=float)
 
-    H_init = np.zeros((2**n, 2**n))
+    H = csr_matrix((2**n, 2**n), dtype=float)
 
     for i in range(n):
-        ops = [I] * n
-        ops[i] = sx
+        term = None
+        for j in range(n):
+            op = sx if i == j else I
+            term = op if term is None else kron(term, op, format="csr")
+        H -= term
 
-        term = ops[0]
-        for op in ops[1:]:
-            term = np.kron(term, op)
+    return H
 
-        H_init -= term
+def build_problem_hamiltonian_sparse(bqm, n):
+    energies = np.empty(2**n)
 
-    return H_init
+    for state in range(2**n):
+        sample = {i: (state >> i) & 1 for i in range(n)}
+        energies[state] = bqm.energy(sample)
+
+    return diags(energies, format="csr")
 
 
 if __name__ == "__main__":
+    pass
+    # n = 16
+    # k = 7
 
-    n = 12
-    k = 6
+    # problem_instance = generate_random_graph_instance({"n": n, "p": 0.5})
+    # bqm = qa_max_clique_bqm(problem_instance, {"k": None})
+    # # matrix_elements = bqm.to_qubo()
+    # # dim = max(matrix_elements[0].keys(), key=lambda x: max(x[0], x[1]))
+    # # max_dim = max(dim[0], dim[1])
+    # # sparse_matrix = dok_matrix((max_dim+1, max_dim+1))
+    # # for pos in matrix_elements[0]:
+    # #     sparse_matrix[pos[0], pos[1]] = matrix_elements[0][pos]
 
-    problem_instance = generate_graph_with_k_clique(n, 0.5, k)
-    bqm = qa_k_clique_bqm(problem_instance, {"k": k})
-    matrix_elements = bqm.to_qubo()
-    dim = max(matrix_elements[0].keys(), key=lambda x: max(x[0], x[1]))
-    max_dim = max(dim[0], dim[1])
-    sparse_matrix = dok_matrix((max_dim+1, max_dim+1))
-    for pos in matrix_elements[0]:
-        sparse_matrix[pos[0], pos[1]] = matrix_elements[0][pos]
+    # # Q = sparse_matrix.toarray()
+    # # Q = (Q + Q.T) / 2
 
-    Q = sparse_matrix.toarray()
-    Q = (Q + Q.T) / 2
+    # print("Preparing hamiltonians")
+    # H_initial = build_initial_hamiltonian_sparse(problem_instance["graph"].number_of_nodes())
+    # H_problem = build_problem_hamiltonian_sparse(bqm, n)
 
-    H_initial = build_initial_hamiltonian(problem_instance["graph"].number_of_nodes())
-    H_problem = np.zeros_like(H_initial)
+    # prev_vec = None
+    # steps = 50
+    # first_k = 8
+    # eigs_array = []
+    
+    # sampler = SimulatedAnnealingSampler()
 
+    # sampleset = sampler.sample(bqm, num_reads=10)
+    # print(sampleset)
 
-    for state in range(H_initial.shape[0]):
-        sample = {i: (state >> i) & 1 for i in range(n)}
-        H_problem[state, state] = bqm.energy(sample)
+    # max_degeneracy = 0
+    # H_initial_min = 999
+    # H_problem_diagonal = np.sort(H_problem.diagonal())
+    # H_problem_range = H_problem_diagonal[-1] - H_problem_diagonal[0]
 
-    H_initial /= 2
-    print(H_problem)
-    print(H_problem.shape)
-    print(H_initial.shape)
-    initial_eigs = np.linalg.eigvalsh(H_initial)
-    # print(H_initial)
-    problem_eigs = np.linalg.eigvalsh(H_problem)
-    initial_range = max(initial_eigs) - min(initial_eigs)
-    problem_range = max(problem_eigs) - min(problem_eigs)
-    initial_center = min(initial_eigs)
-    problem_center = min(problem_eigs)
+    # print("Simulating")
+    # for step in tqdm(range(steps-1)):
+    #     s = step / steps
+    #     Hs = (1 - s) * H_initial + s * H_problem
 
+    #     if step == steps-2:
+    #         H_problem_diag = np.sort(H_problem.diagonal())
+    #         vals = H_problem_diag[:first_k]
 
-    plt.figure()
-    nx.draw(problem_instance["graph"], with_labels=True)
-    plt.show()
+    #     else:
+    #         vals, vecs = eigsh(
+    #             Hs,
+    #             k=first_k,
+    #             which="SA",
+    #             v0=prev_vec,
+    #             return_eigenvectors=True,
+    #             tol=1e-4,
+    #         )
 
-    eigs_array = []
-    first_k = 10
-    steps = 10
-    for step in tqdm(range(steps)):
-        s = step / steps
-        Hs = (1 - s) * H_initial + s * H_problem
-        offset = (1 - s) * initial_center + s * problem_center
-        scales = (1 - s) * initial_range + s * problem_range
-        eigenvalues = (np.linalg.eigvalsh(Hs)[:first_k] - offset) / scales
-        eigs_array.append(eigenvalues)
+    #     order = np.argsort(vals)
+    #     vals = vals[order]
+    #     vecs = vecs[:, order]
+    #     vals -= vals[0]
+    #     prev_vec = vecs[:, 0]
+    #     eigs_array.append(vals)
 
-    eigs_matrix = np.array(eigs_array)
-    plt.figure()
-    for k in range(first_k):
-        plt.plot(np.arange(steps)/steps, eigs_matrix[:,k])
-    plt.show()
+    # eigs_matrix = np.array(eigs_array)
+
+    # ground_tol = 1e-7
+    # ground = 0
+    # ground_degeneracy = np.sum(abs(eigs_array[-1] - ground) < ground_tol)
+    # print(f"Ground state degeneracy: {ground_degeneracy}")
+    # gaps_array = np.min(eigs_matrix[:,ground_degeneracy:], axis=1)
+    # min_gap_index = np.argmin(gaps_array)
+    # min_gap = gaps_array[min_gap_index]
+    # print(f"Minimum gap: {min_gap}")
+    
+    # # print(H_problem_diag[:first_k])
+    # # eigs_array.append(H_problem_diag[:first_k])
+    # # print(eigs_array)
+    
+
+    # _, ax = plt.subplots(1, 2)
+    # ax[0].set_title("Energy levels throughout annealing (relative\n to ground state)")
+    # ax[0].set_ylabel("Energy")
+    # for i in range(first_k):
+    #     ax[0].plot(np.arange(steps-1)/(steps-1), eigs_matrix[:,i])
+    # # plt.plot(np.arange(len(gaps_array)) / steps, gaps_array, label = "Gap")
+    # ax[0].vlines([min_gap_index / (steps-1)], 0, min_gap, color="red")
+    # ax[0].set_xlabel("s")
+    # ax[1].plot(np.arange(len(gaps_array))/(steps-1), gaps_array)
+    # ax[0].grid()
+    # ax[1].grid()
+    # ax[1].set_ylim(bottom=0)
+    # plt.show()
+    # plt.figure()
+    # nx.draw(problem_instance["graph"], with_labels=True)
+    # plt.show()

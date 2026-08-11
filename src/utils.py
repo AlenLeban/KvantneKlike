@@ -59,6 +59,24 @@ def generate_random_graph_instance(size_info):
         "graph": nx.erdos_renyi_graph(size_info["n"], size_info["p"])
     }
 
+def generate_kcore_graph_instance(size_info):
+    graph = nx.erdos_renyi_graph(size_info["n"], size_info["p"])
+    max_clique_size = 0
+    for clique in nx.algorithms.clique.find_cliques(graph):
+        size = len(clique)
+        if size > max_clique_size:
+            max_clique_size = size
+    k_core = nx.k_core(graph, max_clique_size-1)
+    return {
+        "graph": k_core
+    }
+
+def generate_config_model_graph_instance(size_info):
+    graph = nx.configuration_model([size_info["k"]]*size_info["n"], create_using=nx.Graph)
+    return {
+        "graph": graph
+    }
+
 def validate_max_clique_solutions(problem_instance, solutions):
     max_clique_size = 0
     maximal_clique_counts = dict()
@@ -90,6 +108,8 @@ def validate_k_clique_solutions(problem_instance, solutions):
     k_clique_count = count_k_cliques(problem_instance["graph"], k)
 
     return {
+        "n": problem_instance["graph"].number_of_nodes(),
+        "m": problem_instance["graph"].number_of_edges(),
         "valid_cliques": valid_cliques,
         "k": k,
         "is_size_k": is_size_k,
@@ -112,6 +132,7 @@ def is_clique(graph: nx.Graph, solution):
 
 def er_max_clique_size(n, p):
     return float(2*np.log(n)/np.log(1/p))
+
 
 if __name__ == "__main__":
 
