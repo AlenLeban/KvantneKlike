@@ -25,11 +25,16 @@ from utils import er_max_clique_size, generate_k_clique_instance, generate_rando
 
 
 def benchmark_problem_sizes(problem_sizes, output_filename, problem, validate_solutions, instance_generator, num_graphs=3, iters_per_graph=5, method="QAOA", append_graphs=False, append_problem_sizes=False,
-                            use_noise=False, intermediate_results_filename=None):
+                            use_noise=False, intermediate_results_filename=None, max_workers=10):
     out_dict = dict()
     if append_graphs or append_problem_sizes:
-        with open("benchmarkResults/" + output_filename, "r") as f:
-            out_dict = json.load(f)
+        try:
+            with open("benchmarkResults/" + output_filename, "r") as f:
+                out_dict = json.load(f)
+        except:
+            print("Could not open file to append graphs / problem sizes. Setting to false")
+            append_graphs=False
+            append_problem_sizes=False
     if append_problem_sizes:
         out_dict["problem_sizes"].extend(problem_sizes)
     elif not append_graphs:
@@ -82,7 +87,7 @@ def benchmark_problem_sizes(problem_sizes, output_filename, problem, validate_so
                                                 problem=problem, 
                                                 validate_solutions=validate_solutions,
                                                 iters=iters,
-                                                max_workers=10,
+                                                max_workers=max_workers,
                                                 layers=layers,
                                                 use_noisy_optimizer=use_noise,
                                                 intermediate_results_callback=intermediate_results_callback if intermediate_results_filename else None
@@ -109,7 +114,7 @@ def benchmark_problem_sizes(problem_sizes, output_filename, problem, validate_so
                                 problem=problem, 
                                 validate_solutions=validate_solutions,
                                 iters=iters,
-                                max_workers=5,
+                                max_workers=max_workers,
                                 use_noise=use_noise
                                 )
         if append_graphs:

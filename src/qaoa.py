@@ -27,7 +27,7 @@ def build_maxcut_paulis(graph: nx.Graph):
         pauli_list.append(("ZZ", [e[0], e[1]], 1))
     return pauli_list
 
-def build_maxclique_mis_paulis(problem_instance):
+def build_maxclique_mis_paulis(problem_instance, problem_size):
     graph = problem_instance["graph"]
     complement = nx.complement(graph)
     # solve max independent set
@@ -36,7 +36,7 @@ def build_maxclique_mis_paulis(problem_instance):
     for n in complement.nodes():
         pauli_list.append((("Z"), [n], A))
 
-    B = 2/4
+    B = problem_size.get("B", 1/2) if problem_size != None else 1/2
     for e in complement.edges():
         pauli_list.append(("II", [e[0], e[1]], B))
         pauli_list.append(("IZ", [e[0], e[1]], -B))
@@ -53,7 +53,7 @@ def build_kclique_paulis(problem_instance):
     B = 1
     A = B*k + 1
     observable_dict = dict()
-    N = graph.number_of_edges()
+    N = graph.number_of_nodes()
     M = graph.number_of_edges()
 
     for n in graph.nodes():
@@ -68,6 +68,34 @@ def build_kclique_paulis(problem_instance):
         observable_dict[("Z", (e[0],))] = observable_dict.get(("Z", (e[0],)), 0) + B/4
         sorted_nm = sorted([e[0], e[1]])
         observable_dict[("ZZ", (sorted_nm[0],sorted_nm[1]))] = observable_dict.get(("ZZ", (sorted_nm[0], sorted_nm[1])), 0) - B/4
+
+
+    for (pauli, qubits), coeff in observable_dict.items():
+        pauli_list.append((pauli, list(qubits), coeff))
+    return pauli_list
+
+def build_kclique_paulis_fixed(problem_instance, problem_size):
+    
+    graph = problem_instance["graph"]
+    k = problem_instance["k"]
+    complement = nx.complement(graph)
+    pauli_list = []
+    B = problem_size["B"] if problem_size and "B" in problem_size else 2
+    A = 1
+    observable_dict = dict()
+    N = graph.number_of_nodes()
+    M = graph.number_of_edges()
+
+    for n in graph.nodes():
+        observable_dict[("Z", (n,))] = observable_dict.get(("Z", (n,)), 0) + A*k - A*0.5*N - B * complement.degree[n]/4
+        for m in graph.nodes():
+            if n >= m:
+                continue
+            observable_dict[("ZZ", (n,m))] = observable_dict.get(("ZZ", (n,m)), 0) + A*0.5
+
+    for e in complement.edges():
+        sorted_nm = sorted([e[0], e[1]])
+        observable_dict[("ZZ", (sorted_nm[0],sorted_nm[1]))] = observable_dict.get(("ZZ", (sorted_nm[0], sorted_nm[1])), 0) + B/4
 
 
     for (pauli, qubits), coeff in observable_dict.items():
@@ -116,7 +144,7 @@ def cost_func_estimator(params, ansatz, hamiltonian, estimator):
 
     return cost
 
-def quick_run_qaoa(problem_instance, problem, iters=5, num_layers=2, use_noisy_optimizer=False, use_noisy_sampling=False, ansatz_circuit=QAOAAnsatz, num_shots=1000, return_statevectors=False):
+def quick_run_qaoa(problem_instance, problem, problem_size=None, iters=5, num_layers=2, use_noisy_optimizer=False, use_noisy_sampling=False, ansatz_circuit=QAOAAnsatz, num_shots=1000, return_statevectors=False):
 
     # exc = ThreadPoolExecutor(max_workers=2)
     if use_noisy_optimizer:
@@ -136,7 +164,7 @@ def quick_run_qaoa(problem_instance, problem, iters=5, num_layers=2, use_noisy_o
     sampler = Sampler(mode=backend)
     sampler.options.default_shots = num_shots
     pm = generate_preset_pass_manager(optimization_level=3, backend=backend)
-    paulis = problem(problem_instance)
+    paulis = problem(problem_instance, problem_size)
     graph = problem_instance["graph"]
     cost_hamiltonian = SparsePauliOp.from_sparse_list(paulis, graph.number_of_nodes())
 
@@ -189,15 +217,14 @@ def quick_run_qaoa(problem_instance, problem, iters=5, num_layers=2, use_noisy_o
 
     return job.result(), cumulative_optimized_circuit_depth, avg_number_evaluations
 
-def test_graph_qaoa(problem_instance, problem, validate_solutions, iters=5, num_layers=2, use_noisy_optimizer=False, use_noisy_sampling=False, ansatz_circuit=QAOAAnsatz, num_shots=1000):
+def test_graph_qaoa(problem_instance, problem, validate_solutions, problem_size=None, iters=5, num_layers=2, use_noisy_optimizer=False, use_noisy_sampling=False, ansatz_circuit=QAOAAnsatz, num_shots=1000):
 
     validation_results = []
     graph = problem_instance["graph"]
-    results, cumulative_optimized_circuit_depth, avg_number_evaluations = quick_run_qaoa(problem_instance, problem, iters, num_layers, use_noisy_optimizer, use_noisy_sampling, ansatz_circuit, num_shots)
+    results, cumulative_optimized_circuit_depth, avg_number_evaluations = quick_run_qaoa(problem_instance, problem, problem_size, iters, num_layers, use_noisy_optimizer, use_noisy_sampling, ansatz_circuit, num_shots)
     found_bitstrings = []
     for res in results:
         counts_int = res.data.meas.get_int_counts()
-        print(counts_int)
         most_likely = max(counts_int, key=counts_int.get)
 
         most_likely_bitstring = to_bitstring(most_likely, graph.number_of_nodes())
@@ -222,6 +249,7 @@ def _qaoa_graph_worker(args):
     return test_graph_qaoa(
         problem_instance,
         problem=problem,
+        problem_size=s,
         validate_solutions=lambda bitstrings: validate_solutions(problem_instance, bitstrings, s),
         iters=iters if iters is not None else s["iters_per_graph"],
         num_layers=layers if layers is not None else s["layers"],

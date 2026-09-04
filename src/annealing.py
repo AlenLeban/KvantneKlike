@@ -2,12 +2,15 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import numpy as np
 import scipy as sc
+import gc
+import time
 from scipy.sparse import csr_matrix, diags, dok_matrix, identity, kron
 from scipy.sparse.linalg import eigsh
 from matplotlib import pyplot as plt
 import networkx as nx
 import json
 from scipy.optimize import minimize
+import qutip as qt
 
 from dwave.system.samplers import DWaveSampler
 from dwave.system.composites import EmbeddingComposite
@@ -54,18 +57,55 @@ def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, i
 
     bqm = problem(problem_instance, problem_size)
     graph = problem_instance["graph"]
-    sampler = PathIntegralAnnealingSampler() if use_noisy_sampler else SimulatedAnnealingSampler()
-
-    sampleset = sampler.sample(bqm, num_reads=iters)
-
-    node_order = list(graph.nodes)
     solutions = []
-    for sample in sampleset.samples():
-        bitstring = [sample[node] for node in node_order]
-        solutions.append(bitstring)
+    nodes = sorted(graph.nodes)
+    n_qubits = len(nodes)
+    annealing_time = problem_size.get("T", 20)
+    n_steps = problem_size.get("steps", 2000)
+    node_to_qubit = {
+        node: qubit
+        for qubit, node in enumerate(nodes)
+    }
+    bqm = problem(
+        problem_instance,
+        problem_size
+    )
+
+    H_problem = bqm_to_qutip_hamiltonian(
+        bqm,
+        node_to_qubit
+    )
+
+    for run in range(iters):
+        times, final_state = run_quantum_annealing(
+            H_problem,
+            n_qubits,
+            annealing_time=annealing_time,
+            n_steps=n_steps
+        )
+
+        probs = np.abs(final_state.full())**2
+        max_amplitude_state = np.argmax(probs, axis=0)
+        # print(final_state)
+        # print("{0:b}".format(max_amplitude_state[0]))
+        solution = [1 if max_amplitude_state & 2**i > 0 else 0 for i in range(n_qubits)]
+        solutions.append(solution)
+    # solutions = []
+
+    # sampler = PathIntegralAnnealingSampler() if use_noisy_sampler else SimulatedAnnealingSampler()
+    
+    # sampleset = sampler.sample(bqm, num_reads=iters)
+    # print(solutions)
+    # node_order = list(graph.nodes)
+    # solutions = []
+    # for sample in sampleset.samples():
+    #     bitstring = [sample[node] for node in node_order]
+    #     solutions.append(bitstring)
 
     validation_results = validate_solutions(solutions)
     return validation_results
+
+
 
 def qa_graph_worker(args):
     problem_instance, problem_size, problem, validate_solutions, iters, use_noise = args
@@ -134,7 +174,182 @@ def build_problem_hamiltonian_sparse(bqm, n):
     return diags(energies, format="csr")
 
 
+
+def bqm_to_qutip_hamiltonian(bqm, node_to_qubit):
+    """
+    Convert a dimod BinaryQuadraticModel into a QuTiP
+    Ising Hamiltonian.
+
+    Uses:
+
+        x_i = (1 - Z_i) / 2
+    """
+
+    n_qubits = len(node_to_qubit)
+
+    identity = qt.tensor(
+        [qt.qeye(2)] * n_qubits
+    )
+
+    H = bqm.offset * identity
+
+    # Linear terms
+    for node, h in bqm.linear.items():
+
+        q = node_to_qubit[node]
+
+        Z = pauli_z(n_qubits, q)
+
+        H += h / 2 * identity
+        H -= h / 2 * Z
+
+    # Quadratic terms
+    for (u, v), J in bqm.quadratic.items():
+
+        q_u = node_to_qubit[u]
+        q_v = node_to_qubit[v]
+
+        Z_u = pauli_z(n_qubits, q_u)
+        Z_v = pauli_z(n_qubits, q_v)
+
+        H += J / 4 * identity
+        H -= J / 4 * Z_u
+        H -= J / 4 * Z_v
+        H += J / 4 * Z_u * Z_v
+
+    return H
+
+def pauli_z(n_qubits, qubit):
+    operators = []
+
+    for i in range(n_qubits):
+        operators.append(
+            qt.sigmaz() if i == qubit else qt.qeye(2)
+        )
+
+    return qt.tensor(operators)
+
+
+def pauli_x(n_qubits, qubit):
+    operators = []
+
+    for i in range(n_qubits):
+        operators.append(
+            qt.sigmax() if i == qubit else qt.qeye(2)
+        )
+
+    return qt.tensor(operators)
+
+def transverse_field_hamiltonian(n_qubits):
+
+    H = 0
+
+    for q in range(n_qubits):
+        H -= pauli_x(n_qubits, q)
+
+    return H
+
+def initial_plus_state(n_qubits):
+
+    plus = (
+        qt.basis(2, 0)
+        + qt.basis(2, 1)
+    ).unit()
+
+    return qt.tensor(
+        [plus] * n_qubits
+    )
+
+def run_quantum_annealing(
+    H_problem,
+    n_qubits,
+    annealing_time=10.0,
+    n_steps=1000
+):
+
+    H_initial = transverse_field_hamiltonian(
+        n_qubits
+    )
+
+    psi0 = initial_plus_state(n_qubits)
+
+    times = np.linspace(
+        0,
+        annealing_time,
+        n_steps
+    )
+
+    def H_t(t, **kwargs):
+
+        s = t / annealing_time
+
+        return (
+            (1.0 - s) * H_initial
+            + s * H_problem
+        )
+
+
+    result = qt.sesolve(
+        H_t,
+        psi0,
+        times,
+        options={"store_final_state": True, "store_states": False}
+    )
+
+    del H_problem
+    del H_initial
+    del psi0
+    final_state = result.final_state
+    gc.collect()
+    del result
+    return times, final_state
+
+
 if __name__ == "__main__":
+
+    # problem_instance = {
+    #     "graph": nx.erdos_renyi_graph(13, 0.6),
+    #     "k": 5
+    # }
+
+    # plt.figure()
+    # nx.draw(problem_instance["graph"], with_labels=True)
+    # plt.show()
+
+    # nodes = sorted(problem_instance["graph"].nodes)
+    # n_qubits = len(nodes)
+    # node_to_qubit = {
+    #     node: qubit
+    #     for qubit, node in enumerate(nodes)
+    # }
+
+    # bqm_expression = qa_k_clique_bqm(
+    #     problem_instance,
+    #     {"k": 3, "B": 1.1}
+    # )
+
+
+    # bqm = bqm_expression
+
+    # H_problem = bqm_to_qutip_hamiltonian(
+    #     bqm,
+    #     node_to_qubit
+    # )
+    # # print(H_problem)
+
+    # times, result = run_quantum_annealing(
+    #     H_problem,
+    #     n_qubits,
+    #     annealing_time=20.0,
+    #     n_steps=2000
+    # )
+
+    # final_state = result.states[-1]
+    # probs = np.abs(final_state.full())**2
+    # max_amplitude_state = np.argmax(probs, axis=0)
+    # # print(final_state)
+    # print("{0:b}".format(max_amplitude_state[0]))
+
     pass
     # n = 16
     # k = 7

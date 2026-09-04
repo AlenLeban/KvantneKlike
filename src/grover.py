@@ -17,7 +17,7 @@ def is_k_clique_oracle(graph, k):
     q_isk = AncillaRegister(1, "a_isk")
     q_ans = AncillaRegister(1, "a_ans")
     q_mcx_ancilla = AncillaRegister(len(q_edge_ancilla), "a_mcx")
-    qc = QuantumCircuit(q_verts, q_edge_ancilla, q_isclique, q_size, q_isk, q_ans, q_mcx_ancilla)
+    qc = QuantumCircuit(q_verts, q_edge_ancilla, q_isclique, q_size, q_isk, q_ans)
     pair_to_edge_offset = dict()
     for i in range(n):
         for j in range(n):
@@ -47,7 +47,7 @@ def is_k_clique_oracle(graph, k):
 
     # check clique violations
     qc.x(q_edge_ancilla)
-    qc.mcx(q_edge_ancilla, q_isclique, ancilla_qubits=q_mcx_ancilla)
+    qc.mcx(q_edge_ancilla, q_isclique)
 
     qc.barrier()
     # count vertices
@@ -80,7 +80,7 @@ def is_k_clique_oracle(graph, k):
             qc.mcx([q_verts[v]] + list(q_size[:i]), q_size[i])
 
 
-    qc.mcx(q_edge_ancilla, q_isclique, ancilla_qubits=q_mcx_ancilla)
+    qc.mcx(q_edge_ancilla, q_isclique)
     qc.x(q_edge_ancilla)
 
     for n1 in reversed(list(graph.nodes())):
@@ -112,82 +112,90 @@ def is_k_clique_oracle(graph, k):
 if __name__ == "__main__":
     test_graph = nx.Graph()
     test_graph.add_nodes_from([0, 1, 2])
-    test_graph.add_edges_from([(0, 1), (0, 2), (1, 2)])
+    test_graph.add_edges_from([(0, 1), (1, 2), (0, 2)])
+    samples = 1
+    n = 3
+    avg_depth = 0
+    for s in range(samples):
+        # test_graph = nx.erdos_renyi_graph(n, 0.5)
 
-    circuit = is_k_clique_oracle(test_graph, 3)
+        oracle_circuit = is_k_clique_oracle(test_graph, n)
 
-    grover_circuit_iter = grover_operator(circuit, reflection_qubits=list(range(test_graph.number_of_nodes())))
-    # grover_circuit_iter.draw("mpl")
+        grover_circuit_iter = grover_operator(oracle_circuit, reflection_qubits=list(range(test_graph.number_of_nodes())))
+        # grover_circuit_iter.draw("mpl")
 
-    iterations = 1
-    grover_circuit = QuantumCircuit(grover_circuit_iter.num_qubits, test_graph.number_of_nodes())
-    grover_circuit.h(range(test_graph.number_of_nodes()))
-    grover_circuit.compose(grover_circuit_iter.power(iterations), inplace=True)
-    grover_circuit.measure(range(test_graph.number_of_nodes()), range(test_graph.number_of_nodes()))
+        iterations = 1
+        grover_circuit = QuantumCircuit(grover_circuit_iter.num_qubits, test_graph.number_of_nodes())
+        grover_circuit.h(range(test_graph.number_of_nodes()))
+        grover_circuit.compose(grover_circuit_iter.power(iterations), inplace=True)
+        grover_circuit.measure(range(test_graph.number_of_nodes()), range(test_graph.number_of_nodes()))
 
-    grover_circuit_t = transpile(grover_circuit, basis_gates=["rz", "sx", "cx"])
-    print(f"Transpiled depth: {grover_circuit_t.depth()}")
-    circuit.draw("mpl", scale=1, fold=50)
-    plt.savefig("Figures/grover_circuit_test.png")
+        grover_circuit_t = transpile(grover_circuit, basis_gates=["rz", "sx", "cx"])
+        avg_depth += grover_circuit_t.depth()
+        # print(grover_circuit.num_qubits)
+        print(f"Avg Transpiled depth: {avg_depth / samples}")
+        oracle_circuit.draw("mpl", scale=1, fold=50)
+        plt.savefig("Figures/grover_circuit_test.png")
     # print(grover_circuit.num_qubits)
 
-    grover_use_simulator = False
-    if not grover_use_simulator:
-        service = QiskitRuntimeService()
 
-        backend = service.least_busy(
-            operational=True, simulator=False, min_num_qubits=127
-        )
-    else:
-        backend = FakeBrisbane()
-        # backend = AerSimulator()
-    print(backend)
+    # grover_use_simulator = True
+    # if not grover_use_simulator:
+    #     service = QiskitRuntimeService()
 
-    sampler = Sampler(mode=backend)
-    sampler.options.default_shots = 1024
-    sampler.options.dynamical_decoupling.enable = True
-    sampler.options.dynamical_decoupling.sequence_type = "XY4"
-    pm = generate_preset_pass_manager(optimization_level=2, backend=backend)
-    candidate_circuit = pm.run(grover_circuit)
+    #     backend = service.least_busy(
+    #         operational=True, simulator=False, min_num_qubits=127
+    #     )
+    # else:
+    #     backend = FakeBrisbane()
+    #     # backend = AerSimulator()
+    # print(backend)
 
-    print("Original qubits:", grover_circuit.num_qubits)
-    print("Transpiled qubits:", candidate_circuit.num_qubits)
-    print("Backend qubits:", backend.num_qubits)
+    # sampler = Sampler(mode=backend)
+    # sampler.options.default_shots = 1024
+    # sampler.options.dynamical_decoupling.enable = True
+    # sampler.options.dynamical_decoupling.sequence_type = "XY4"
+    # pm = generate_preset_pass_manager(optimization_level=2, backend=backend)
+    # candidate_circuit = pm.run(grover_circuit)
 
-    print("depth:", candidate_circuit.depth())
-    print("ops:", candidate_circuit.count_ops())
-    print("qubits:", candidate_circuit.num_qubits)
+    # print("Original qubits:", grover_circuit.num_qubits)
+    # print("Transpiled qubits:", candidate_circuit.num_qubits)
+    # print("Backend qubits:", backend.num_qubits)
+
+    # print("depth:", candidate_circuit.depth())
+    # print("ops:", candidate_circuit.count_ops())
+    # print("qubits:", candidate_circuit.num_qubits)
 
 
 
-    pub = (candidate_circuit, )
-    job = sampler.run([pub])
-    print(job.result()[0].data.c)
-    counts_int = job.result()[0].data.c.get_int_counts()
-    counts_bin = job.result()[0].data.c.get_counts()
-    shots = sum(counts_int.values())
-    final_distribution_int = {key: val / shots for key, val in counts_int.items()}
-    final_distribution_bin = {key: val / shots for key, val in counts_bin.items()}
-    print(final_distribution_int)
-    print(counts_int)
-    print(counts_bin)
-    plt.rcParams.update({"font.size": 10})
-    final_bits = final_distribution_bin
-    values = np.abs(list(final_bits.values()))
-    top_4_values = sorted(values, reverse=True)[:4]
-    positions = []
-    for value in top_4_values:
-        positions.append(np.where(values == value)[0])
-    fig = plt.figure(figsize=(3, 6))
-    ax = fig.add_subplot(1, 1, 1)
-    fig.subplots_adjust(left=0.2)
-    plt.xticks(rotation=90)
-    plt.title("Real backend")
-    plt.xlabel("Bitstrings (reversed)")
-    plt.ylabel("Probability")
-    ax.bar(list(final_bits.keys()), list(final_bits.values()), color="tab:grey")
-    for p in positions:
-        ax.get_children()[int(p[0])].set_color("tab:purple")
-    plt.show()
+    # pub = (candidate_circuit, )
+    # job = sampler.run([pub])
+    # print(job.result()[0].data.c)
+    # counts_int = job.result()[0].data.c.get_int_counts()
+    # counts_bin = job.result()[0].data.c.get_counts()
+    # shots = sum(counts_int.values())
+    # final_distribution_int = {key: val / shots for key, val in counts_int.items()}
+    # final_distribution_bin = {key: val / shots for key, val in counts_bin.items()}
+    # print(final_distribution_int)
+    # print(counts_int)
+    # print(counts_bin)
+    # plt.rcParams.update({"font.size": 10})
+    # final_bits = final_distribution_bin
+    # values = np.abs(list(final_bits.values()))
+    # top_4_values = sorted(values, reverse=True)[:4]
+    # positions = []
+    # for value in top_4_values:
+    #     positions.append(np.where(values == value)[0])
+    # fig = plt.figure(figsize=(3, 6))
+    # ax = fig.add_subplot(1, 1, 1)
+    # fig.subplots_adjust(left=0.2)
+    # plt.xticks(rotation=90)
+    # plt.title("Real backend")
+    # plt.xlabel("Bitstrings (reversed)")
+    # plt.ylabel("Probability")
+    # ax.bar(list(final_bits.keys()), list(final_bits.values()), color="tab:grey")
+    # for p in positions:
+    #     ax.get_children()[int(p[0])].set_color("tab:purple")
+    # plt.show()
 
 # candidate_circuit.draw("mpl")
