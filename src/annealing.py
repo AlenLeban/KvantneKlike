@@ -53,7 +53,7 @@ def qa_k_clique_bqm(problem_instance, problem_size):
     return hamiltonian
 
 
-def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, iters=10, use_noisy_sampler=False):
+def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, iters=10, use_noisy_sampler=False, return_eigenenergies=False):
 
     bqm = problem(problem_instance, problem_size)
     graph = problem_instance["graph"]
@@ -66,30 +66,40 @@ def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, i
         node: qubit
         for qubit, node in enumerate(nodes)
     }
-    bqm = problem(
-        problem_instance,
-        problem_size
-    )
 
     H_problem = bqm_to_qutip_hamiltonian(
         bqm,
         node_to_qubit
     )
 
-    for run in range(iters):
-        times, final_state = run_quantum_annealing(
-            H_problem,
-            n_qubits,
-            annealing_time=annealing_time,
-            n_steps=n_steps
-        )
+    energies = None
 
-        probs = np.abs(final_state.full())**2
-        max_amplitude_state = np.argmax(probs, axis=0)
-        # print(final_state)
-        # print("{0:b}".format(max_amplitude_state[0]))
-        solution = [1 if max_amplitude_state & 2**i > 0 else 0 for i in range(n_qubits)]
-        solutions.append(solution)
+    times, final_state, energies = run_quantum_annealing(
+        H_problem,
+        n_qubits,
+        annealing_time=annealing_time,
+        n_steps=n_steps,
+        return_eigenenergies=return_eigenenergies
+    )
+
+    probs = np.abs(final_state.full().flatten())**2
+
+    success_probability = 0.0
+
+    for state in range(2**n_qubits):
+        solution = [
+            1 if state & 2**(n_qubits - 1 - i) else 0
+            for i in range(n_qubits)
+        ]
+
+        if validate_solutions([solution])["found_solution"]:
+            success_probability += probs[state]
+    # max_amplitude_state = np.argmax(probs, axis=0)
+    # print(final_state)
+    # print("{0:b}".format(max_amplitude_state[0]))
+    # print(max_amplitude_state)
+    # solution = [1 if max_amplitude_state & 2**(n_qubits - 1 - i) > 0 else 0 for i in range(n_qubits)]
+    # print(solution)
     # solutions = []
 
     # sampler = PathIntegralAnnealingSampler() if use_noisy_sampler else SimulatedAnnealingSampler()
@@ -102,13 +112,20 @@ def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, i
     #     bitstring = [sample[node] for node in node_order]
     #     solutions.append(bitstring)
 
-    validation_results = validate_solutions(solutions)
-    return validation_results
+    # validation_results = validate_solutions(solutions)
+    return_payload = [
+        {
+            "success_probability": success_probability
+        }
+    ]
+    if return_eigenenergies:
+        return_payload.append(energies)
+    return return_payload[0] if len(return_payload) == 1 else return_payload
 
 
 
 def qa_graph_worker(args):
-    problem_instance, problem_size, problem, validate_solutions, iters, use_noise = args
+    problem_instance, problem_size, problem, validate_solutions, iters, use_noise, return_eigenenergies = args
 
     return test_graph_qa(
         problem_instance=problem_instance,
@@ -116,10 +133,11 @@ def qa_graph_worker(args):
         validate_solutions=lambda bitstrings: validate_solutions(problem_instance, bitstrings, problem_size),
         problem_size=problem_size,
         iters=iters if iters is not None else problem_size["iters_per_graph"],
-        use_noisy_sampler=use_noise
+        use_noisy_sampler=use_noise,
+        return_eigenenergies=return_eigenenergies
     )
 
-def test_problem_sizes_qa(sizes, generate_instance, instance_count, problem, validate_solutions, iters=None, max_workers=4, use_noise=False):
+def test_problem_sizes_qa(sizes, generate_instance, instance_count, problem, validate_solutions, iters=None, max_workers=4, use_noise=False, return_eigenenergies=False):
     validation_results_per_size = []
 
     for s in sizes:
@@ -128,7 +146,7 @@ def test_problem_sizes_qa(sizes, generate_instance, instance_count, problem, val
         problem_instances = [generate_instance(s) for _ in range(instance_count)]
 
         args = [
-            (problem_instance, s, problem, validate_solutions, iters, use_noise)
+            (problem_instance, s, problem, validate_solutions, iters, use_noise, return_eigenenergies)
             for problem_instance in problem_instances
         ]
 
@@ -264,7 +282,8 @@ def run_quantum_annealing(
     H_problem,
     n_qubits,
     annealing_time=10.0,
-    n_steps=1000
+    n_steps=1000,
+    return_eigenenergies = False
 ):
 
     H_initial = transverse_field_hamiltonian(
@@ -296,13 +315,20 @@ def run_quantum_annealing(
         options={"store_final_state": True, "store_states": False}
     )
 
-    del H_problem
-    del H_initial
-    del psi0
     final_state = result.final_state
+    energies_array = None
+    if return_eigenenergies:
+        energies_array = []
+        for t in tqdm(times[:-1]):
+            H_at_t = H_t(t)
+            energies = np.real(H_at_t.eigenenergies(sparse=True, eigvals=5, sort="low"))
+            energies_array.append(energies.tolist()) 
     gc.collect()
+    del H_problem
+    del psi0
+    del H_initial
     del result
-    return times, final_state
+    return times, final_state, energies_array
 
 
 if __name__ == "__main__":

@@ -15,12 +15,12 @@ if __name__ == "__main__":
     for i in range(10):
         print(f"Iteration {i}")
         benchmark_problem_sizes(
-            [ {"n": n, "p": 0.4, "k": er_max_clique_size(n, 0.4)-1, "iters_per_graph" : 4} for n in range(6, 14)],
-            "qa_qutip_results_kclique_n.json",
+            [ {"n": n, "p": 0.4, "k": er_max_clique_size(n, 0.4)-1, "iters_per_graph" : 1, "T":20, "B": er_max_clique_size(n, 0.4)-1} for n in range(6, 14)],
+            "qa_qutip_results_kclique_n3.json",
             problem=qa_k_clique_bqm,
             validate_solutions=helper_validate_k_clique_solutions,
             instance_generator=generate_k_clique_instance,
-            num_graphs=100,
+            num_graphs=60,
             method="QA",
             append_graphs=True,
             use_noise=False,
@@ -118,34 +118,51 @@ if __name__ == "__main__":
     # for i in range(10):
     #     print(f"Iteration {i}")
     #     benchmark_problem_sizes(
-    #         [ {"n": n, "p": 0.4, "k": er_max_clique_size(n, 0.4)-1, "iters_per_graph" : 8, "B": B} for B in [0.5, 1, 2, 3] for n in [6, 8, 10, 12]],
-    #         "qa_qutip_results_kclique_b_n.json",
+    #         [ {"n": n, "p": 0.4, "k": er_max_clique_size(n, 0.4)-1, "iters_per_graph" : 1, "B": B, "T":20} for B in [2, 3, 3.5, 4, 4.5, 5] for n in [6, 8, 10, 12]],
+    #         "qa_qutip_results_kclique_b_n5.json",
     #         problem=qa_k_clique_bqm,
     #         validate_solutions=helper_validate_k_clique_solutions,
     #         instance_generator=generate_k_clique_instance,
-    #         num_graphs=20,
+    #         num_graphs=60,
     #         method="QA",
     #         append_graphs=True,
+    #         append_problem_sizes=False,
     #         use_noise=False,
-    #         max_workers=10
+    #         max_workers=12
     #     )
 
     # test qa on finding k-clique, annealing_time T
     # for i in range(10):
     #     print(f"Iteration {i}")
     #     benchmark_problem_sizes(
-    #         [ {"n": 8, "p": 0.4, "k": er_max_clique_size(8, 0.4)-1, "iters_per_graph" : 8, "B": 2, "T": T} for T in [200, 500]],
-    #         "qa_qutip_results_kclique_T.json",
+    #         [ {"n": 8, "p": 0.4, "k": er_max_clique_size(8, 0.4)-1, "iters_per_graph" : 1, "B": 2, "T": T} for T in [50, 100]],
+    #         "qa_qutip_results_kclique_T4.json",
     #         problem=qa_k_clique_bqm,
     #         validate_solutions=helper_validate_k_clique_solutions,
     #         instance_generator=generate_k_clique_instance,
-    #         num_graphs=20,
+    #         num_graphs=12,
     #         method="QA",
     #         append_graphs=False,
     #         append_problem_sizes=True,
     #         use_noise=False,
-    #         max_workers=10
+    #         max_workers=12
     #     )
+
+    # test qa on finding k-clique, eigenenergies
+    # benchmark_problem_sizes(
+    #     [ {"n": 9, "p": 0.4, "k": er_max_clique_size(9, 0.4)-1, "iters_per_graph" : 1, "B": 2, "T": 4, "steps": 50}],
+    #     "qa_qutip_results_kclique_eigen.json",
+    #     problem=qa_k_clique_bqm,
+    #     validate_solutions=helper_validate_k_clique_solutions,
+    #     instance_generator=generate_k_clique_instance,
+    #     num_graphs=1,
+    #     method="QA",
+    #     append_graphs=False,
+    #     append_problem_sizes=False,
+    #     use_noise=False,
+    #     max_workers=1,
+    #     return_eigenenergies=True
+    # )
 
     # testing qa on finding k-clique, steps
     # for i in range(10):
@@ -177,22 +194,23 @@ if __name__ == "__main__":
 
 
 
-    
+
 
     # test qa on findinig max-clique, different n
-    # for i in range(10):
-    #     print(f"Iteration {i}")
-    #     benchmark_problem_sizes(
-    #         [ {"n": n, "p": 0.4, "k": None, "iters_per_graph" : 4, "B": 1.1} for n in range(6, 14)],
-    #         "qa_qutip_results_maxclique_n.json",
-    #         problem=qa_max_clique_bqm,
-    #         validate_solutions=helper_validate_max_clique_solutions,
-    #         instance_generator=generate_random_graph_instance,
-    #         num_graphs=100,
-    #         method="QA",
-    #         append_graphs=True,
-    #         use_noise=False,
-    #     )
+    for i in range(10):
+        print(f"Iteration {i}")
+        benchmark_problem_sizes(
+            [ {"n": n, "p": 0.4, "k": None, "iters_per_graph" : 1, "B": 4} for n in range(6, 14)],
+            "qa_qutip_results_maxclique_n3.json",
+            problem=qa_max_clique_bqm,
+            validate_solutions=helper_validate_max_clique_solutions,
+            instance_generator=generate_random_graph_instance,
+            num_graphs=60,
+            method="QA",
+            append_graphs=True,
+            use_noise=False,
+            max_workers=12
+        )
 
 
     # test qa on findinig max-clique, different n
@@ -211,18 +229,20 @@ if __name__ == "__main__":
     #     )
 
     # test qa on findinig max-clique, different b coefficient for bqm, different n
-    # benchmark_problem_sizes(
-    #     # [ {"n": n, "p": 0.4, "k": None, "iters_per_graph" : 4, "B": float(b)} for b in np.arange(0.25, 2.0, 0.25) for n in [75, 125, 205, 340]],
-    #     [ {"n": int(n), "p": 0.4, "k": None, "iters_per_graph" : 4, "B": float(b)} for b in np.arange(0.6, 2.0, 0.25) for n in np.arange(75, 200, 25)],
-    #     "qa_results_maxclique_n_b.json",
-    #     problem=qa_max_clique_bqm,
-    #     validate_solutions=helper_validate_max_clique_solutions,
-    #     instance_generator=generate_random_graph_instance,
-    #     num_graphs=200,
-    #     method="QA",
-    #     append_graphs=True,
-    #     use_noise=False,
-    # )
+    # for i in range(10):
+    #     print(f"Iteration {i}")
+    #     benchmark_problem_sizes(
+    #         # [ {"n": n, "p": 0.4, "k": None, "iters_per_graph" : 4, "B": float(b)} for b in np.arange(0.25, 2.0, 0.25) for n in [75, 125, 205, 340]],
+    #         [ {"n": int(n), "p": 0.4, "k": None, "iters_per_graph" : 4, "B": float(b)} for b in [2, 3, 4, 6, 8] for n in [6, 8, 10, 12]],
+    #         "qa_qutip_results_maxclique_n_b2.json",
+    #         problem=qa_max_clique_bqm,
+    #         validate_solutions=helper_validate_max_clique_solutions,
+    #         instance_generator=generate_random_graph_instance,
+    #         num_graphs=24,
+    #         method="QA",
+    #         append_graphs=True,
+    #         use_noise=False,
+    #     )
 
     # test qa on finding max-clique, different iters per graph
     # benchmark_problem_sizes(

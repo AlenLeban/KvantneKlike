@@ -25,7 +25,7 @@ from utils import er_max_clique_size, generate_k_clique_instance, generate_rando
 
 
 def benchmark_problem_sizes(problem_sizes, output_filename, problem, validate_solutions, instance_generator, num_graphs=3, iters_per_graph=5, method="QAOA", append_graphs=False, append_problem_sizes=False,
-                            use_noise=False, intermediate_results_filename=None, max_workers=10):
+                            use_noise=False, intermediate_results_filename=None, max_workers=10, return_eigenenergies=False):
     out_dict = dict()
     if append_graphs or append_problem_sizes:
         try:
@@ -115,7 +115,8 @@ def benchmark_problem_sizes(problem_sizes, output_filename, problem, validate_so
                                 validate_solutions=validate_solutions,
                                 iters=iters,
                                 max_workers=max_workers,
-                                use_noise=use_noise
+                                use_noise=use_noise,
+                                return_eigenenergies=return_eigenenergies
                                 )
         if append_graphs:
             for i in range(len(problem_sizes if not append_graphs else out_dict["problem_sizes"])):
