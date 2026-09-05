@@ -318,21 +318,18 @@ if __name__ == "__main__":
     #     )
 
     # test qa on finding max-clique, different schedule
-    for i in range(10):
+    for i in range(1):
         print(f"Iteration {i}")
         benchmark_problem_sizes(
-            [ {"n": n, "p": 0.4, "k": None, "iters_per_graph" : 1, "T":20, "B": 4, "schedule": schedule} for schedule in [
-                "linear",
-                "geometric_1"
-            ] for n in [6, 8, 10, 12]],
+            [ {"n": n, "p": 0.4, "k": None, "iters_per_graph" : 1, "T":20, "B": 4, "schedule_power": schedule_power, "steps":500} for schedule_power in [0.8, 1.0, 1.2, 1.4, 1.6] for n in [13, 14]],
             "qa_qutip_results_maxclique_schedule.json",
             problem=qa_max_clique_bqm,
             validate_solutions=helper_validate_max_clique_solutions,
             instance_generator=generate_random_graph_instance,
             num_graphs=24,
             method="QA",
-            append_graphs=True,
-            append_problem_sizes=False,
+            append_graphs=False,
+            append_problem_sizes=True,
             use_noise=False,
             max_workers=12
         )

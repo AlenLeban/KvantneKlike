@@ -83,7 +83,8 @@ def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, i
         n_steps=n_steps,
         return_eigenenergies=return_eigenenergies,
         use_noise=use_noisy_sampler,
-        schedule=problem_size.get("schedule", "linear")
+        schedule=problem_size.get("schedule", "linear"),
+        schedule_power = problem_size.get("schedule_power", 1)
     )
 
     probs = np.abs(final_state.full().flatten())**2
@@ -271,7 +272,8 @@ def run_quantum_annealing(
     n_steps=1000,
     return_eigenenergies = False,
     use_noise = False,
-    schedule = "linear"
+    schedule = "linear",
+    schedule_power = 1
 ):
 
     H_initial = transverse_field_hamiltonian(
@@ -280,27 +282,46 @@ def run_quantum_annealing(
 
     psi0 = initial_plus_state(n_qubits)
 
+    # Annealing schedule s(t)
     if schedule == "linear":
-        times = np.linspace(
-            0,
-            annealing_time,
-            n_steps
-        )
-    elif schedule == "geometric_1":
-        times = geometric_1(0, annealing_time, n_steps)
+        def s_schedule(t):
+            return t / annealing_time
+
+    elif schedule == "poly_2":
+        def s_schedule(t):
+            x = t / annealing_time
+            return x**2
+
+    elif schedule == "poly_3":
+            def s_schedule(t):
+                x = t / annealing_time
+                return x**3
+
+    elif schedule == "sqrt":
+        def s_schedule(t):
+            x = t / annealing_time
+            return np.sqrt(x)
+
+    # elif schedule == "geometric_1":
+    #     def s_schedule(t):
+    #         x = t / annealing_time
+    #         return 
+
     elif callable(schedule):
-        times = schedule(0, annealing_time, n_steps)
+        s_schedule = schedule
+
     else:
         raise Exception("Invalid annealing schedule provided")
 
     def H_t(t, **kwargs):
-
-        s = t / annealing_time
+        s = np.power(s_schedule(t), schedule_power)
 
         return (
             (1.0 - s) * H_initial
             + s * H_problem
         )
+
+    times = np.linspace(0, annealing_time, n_steps)
 
     if not use_noise:
         result = qt.sesolve(
