@@ -52,6 +52,8 @@ def qa_k_clique_bqm(problem_instance, problem_size):
 
     return hamiltonian
 
+def geometric_1(a,b,c):
+    return np.geomspace(a+1, b+1, c) - 1
 
 def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, iters=10, use_noisy_sampler=False, return_eigenenergies=False):
 
@@ -79,7 +81,9 @@ def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, i
         n_qubits,
         annealing_time=annealing_time,
         n_steps=n_steps,
-        return_eigenenergies=return_eigenenergies
+        return_eigenenergies=return_eigenenergies,
+        use_noise=use_noisy_sampler,
+        schedule=problem_size.get("schedule", "linear")
     )
 
     probs = np.abs(final_state.full().flatten())**2
@@ -94,25 +98,7 @@ def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, i
 
         if validate_solutions([solution])["found_solution"]:
             success_probability += probs[state]
-    # max_amplitude_state = np.argmax(probs, axis=0)
-    # print(final_state)
-    # print("{0:b}".format(max_amplitude_state[0]))
-    # print(max_amplitude_state)
-    # solution = [1 if max_amplitude_state & 2**(n_qubits - 1 - i) > 0 else 0 for i in range(n_qubits)]
-    # print(solution)
-    # solutions = []
-
-    # sampler = PathIntegralAnnealingSampler() if use_noisy_sampler else SimulatedAnnealingSampler()
     
-    # sampleset = sampler.sample(bqm, num_reads=iters)
-    # print(solutions)
-    # node_order = list(graph.nodes)
-    # solutions = []
-    # for sample in sampleset.samples():
-    #     bitstring = [sample[node] for node in node_order]
-    #     solutions.append(bitstring)
-
-    # validation_results = validate_solutions(solutions)
     return_payload = [
         {
             "success_probability": success_probability
@@ -283,7 +269,9 @@ def run_quantum_annealing(
     n_qubits,
     annealing_time=10.0,
     n_steps=1000,
-    return_eigenenergies = False
+    return_eigenenergies = False,
+    use_noise = False,
+    schedule = "linear"
 ):
 
     H_initial = transverse_field_hamiltonian(
@@ -292,11 +280,18 @@ def run_quantum_annealing(
 
     psi0 = initial_plus_state(n_qubits)
 
-    times = np.linspace(
-        0,
-        annealing_time,
-        n_steps
-    )
+    if schedule == "linear":
+        times = np.linspace(
+            0,
+            annealing_time,
+            n_steps
+        )
+    elif schedule == "geometric_1":
+        times = geometric_1(0, annealing_time, n_steps)
+    elif callable(schedule):
+        times = schedule(0, annealing_time, n_steps)
+    else:
+        raise Exception("Invalid annealing schedule provided")
 
     def H_t(t, **kwargs):
 
@@ -307,13 +302,51 @@ def run_quantum_annealing(
             + s * H_problem
         )
 
+    if not use_noise:
+        result = qt.sesolve(
+            H_t,
+            psi0,
+            times,
+            options={"store_final_state": True, "store_states": False}
+        )
+    else:
 
-    result = qt.sesolve(
-        H_t,
-        psi0,
-        times,
-        options={"store_final_state": True, "store_states": False}
-    )
+        N = n_qubits
+
+        def make_si(op, i, N):
+            op_list = [qt.qeye(2)] * N
+            op_list[i] = op
+            return qt.tensor(op_list)
+        
+        # 4. Define D-Wave Environmental Noise Channels (c_ops) for ALL qubits
+        gamma_dephase = 0.05    # Pure dephasing rate (flux noise)
+        gamma_relax = 0.02      # Thermal relaxation rate (T1)
+
+        c_ops = []
+        for i in range(N):
+            # In D-Wave, flux noise acts locally via each qubit's Z axis
+            c_dephase = np.sqrt(gamma_dephase) * make_si(qt.sigmaz(), i, N)
+            
+            # Energy relaxation and thermal excitation acting locally on each qubit
+            c_down = np.sqrt(gamma_relax * 0.9) * make_si(qt.destroy(2), i, N)
+            c_up   = np.sqrt(gamma_relax * 0.1) * make_si(qt.create(2), i, N)
+            
+            # Add this qubit's noise channels to the global list
+
+            c_ops.extend([c_dephase, c_down, c_up])
+
+        # Track the expectation value of <Sigma_Z> for every individual qubit
+        e_ops = [make_si(qt.sigmaz(), i, N) for i in range(N)]
+
+        result = qt.mesolve(
+            H_t,
+            psi0,
+            times,
+            c_ops=c_ops,
+            e_ops=e_ops,
+            options={"store_final_state": True, "store_states": False}
+        )
+
 
     final_state = result.final_state
     energies_array = None
