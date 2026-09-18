@@ -10,6 +10,9 @@ from matplotlib import pyplot as plt
 import networkx as nx
 import json
 from scipy.optimize import minimize
+from scipy.interpolate import LinearNDInterpolator, CubicSpline
+from bayes_opt import BayesianOptimization
+from bayes_opt import acquisition
 import qutip as qt
 
 from dwave.system.samplers import DWaveSampler
@@ -19,7 +22,9 @@ from dimod import Binary, ExactSolver
 from dwave.samplers import PathIntegralAnnealingSampler
 from tqdm import tqdm
 
-from utils import generate_graph_with_k_clique, generate_random_graph_instance, is_number
+from helper_functions import helper_validate_max_clique_solutions, helper_validate_k_clique_solutions
+from utils import er_max_clique_size, generate_graph_with_k_clique, generate_k_clique_instance, generate_random_graph_instance, is_number
+
 
 def qa_max_clique_bqm(problem_instance, problem_size):
     graph = problem_instance["graph"]
@@ -84,7 +89,7 @@ def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, i
         return_eigenenergies=return_eigenenergies,
         use_noise=use_noisy_sampler,
         schedule=problem_size.get("schedule", "linear"),
-        schedule_power = problem_size.get("schedule_power", 1)
+        schedule_params = problem_size.get("schedule_params", [1])
     )
 
     probs = np.abs(final_state.full().flatten())**2
@@ -273,7 +278,7 @@ def run_quantum_annealing(
     return_eigenenergies = False,
     use_noise = False,
     schedule = "linear",
-    schedule_power = 1
+    schedule_params = [1]
 ):
 
     H_initial = transverse_field_hamiltonian(
@@ -287,6 +292,19 @@ def run_quantum_annealing(
         def s_schedule(t):
             return t / annealing_time
 
+    elif schedule == "lin_interp":
+        def s_schedule(t):
+            s = t / annealing_time
+            # print(f"lininterping!! {np.interp(s, np.linspace(0, 1, len(schedule_params)+2), [0, *schedule_params, 1])}")
+            return np.interp(s, np.linspace(0, 1, len(schedule_params)+2), [0, *schedule_params, 1])
+
+    elif schedule == "cubic_interp":
+        def s_schedule(t):
+            s = t / annealing_time
+            cs = CubicSpline(np.linspace(0, 1, len(schedule_params)+2), [0, *schedule_params, 1])
+            # print(f"lininterping!! {np.interp(s, np.linspace(0, 1, len(schedule_params)+2), [0, *schedule_params, 1])}")
+            return cs(s)
+        
     elif schedule == "poly_2":
         def s_schedule(t):
             x = t / annealing_time
@@ -314,8 +332,8 @@ def run_quantum_annealing(
         raise Exception("Invalid annealing schedule provided")
 
     def H_t(t, **kwargs):
-        s = np.power(s_schedule(t), schedule_power)
-
+        # s = np.power(s_schedule(t), schedule)
+        s = s_schedule(t)
         return (
             (1.0 - s) * H_initial
             + s * H_problem
@@ -368,6 +386,8 @@ def run_quantum_annealing(
             options={"store_final_state": True, "store_states": False}
         )
 
+    problem_energies = np.real(H_problem.eigenenergies(sparse=True, sort="low"))
+    problem_energy_range = problem_energies[-1] - problem_energies[0]
 
     final_state = result.final_state
     energies_array = None
@@ -375,8 +395,9 @@ def run_quantum_annealing(
         energies_array = []
         for t in tqdm(times[:-1]):
             H_at_t = H_t(t)
-            energies = np.real(H_at_t.eigenenergies(sparse=True, eigvals=5, sort="low"))
+            energies = np.real(H_at_t.eigenenergies(sparse=True, eigvals=10, sort="low")) / problem_energy_range
             energies_array.append(energies.tolist()) 
+
     gc.collect()
     del H_problem
     del psi0
@@ -392,9 +413,99 @@ if __name__ == "__main__":
     #     "k": 5
     # }
 
-    # plt.figure()
-    # nx.draw(problem_instance["graph"], with_labels=True)
-    # plt.show()
+    def run_qa(schedule_params):
+        results = test_problem_sizes_qa(
+            # [{"n": 9, "p": 0.4, "k": None, "schedule": "lin_interp", "schedule_params": list(params.values())}],
+            # [{"n": 9, "p": 0.4, "k": None, "schedule": "lin_interp", "schedule_params": offsets}],
+            sizes=[{"n": 8, "p": 0.4, "k": er_max_clique_size(8, 0.4)-1, "schedule": "cubic_interp", "schedule_params": schedule_params, "steps":30}],
+            generate_instance=generate_k_clique_instance,
+            instance_count=12,
+            problem=qa_k_clique_bqm,
+            validate_solutions=helper_validate_k_clique_solutions,
+            iters=1,
+            max_workers=12,
+            return_eigenenergies=True
+        )
+
+        # foreach problem size, foreach instance [success prob and energies]
+        # probs = [p["success_probability"] for p in results]
+        total_prob = 0
+        for r in results[0]:
+            total_prob += r[0]["success_probability"]
+        avg_prob = total_prob / len(results[0])
+
+        energies_over_time = [p[1] for p in results[0]]
+
+        return avg_prob, energies_over_time
+
+    def bo_run_qa(**params):
+
+        # constraint that each next value must be larger
+        if sum(list(params.values())) > 1:
+            return 0
+
+        offsets = [0]
+        for v in list(params.values()):
+            current_sum = offsets[-1] + v
+            if current_sum > 1 or current_sum < 0:
+                return 0
+            offsets.append(offsets[-1] + v)
+        offsets = offsets[1:]
+        
+        # results = test_problem_sizes_qa(
+        #     # [{"n": 9, "p": 0.4, "k": None, "schedule": "lin_interp", "schedule_params": list(params.values())}],
+        #     # [{"n": 9, "p": 0.4, "k": None, "schedule": "lin_interp", "schedule_params": offsets}],
+        #     [{"n": 9, "p": 0.4, "k": None, "schedule": "cubic_interp", "schedule_params": offsets}],
+        #     generate_instance=generate_random_graph_instance,
+        #     instance_count=400,
+        #     problem=qa_max_clique_bqm,
+        #     validate_solutions=helper_validate_max_clique_solutions,
+        #     iters=1,
+        #     max_workers=12
+        # )
+
+        avg_prob, _ = run_qa(offsets)
+        return avg_prob
+
+    acquisition_function = acquisition.ExpectedImprovement(xi=0.05)
+    n_params = 3
+    pbounds = {f"p{i}": (0, 0.6) for i in range(n_params)}
+    print(pbounds)
+    optimizer = BayesianOptimization(
+        f=bo_run_qa,
+        pbounds=pbounds,
+        verbose=2,
+        allow_duplicate_points=True,
+        acquisition_function=acquisition_function
+    )
+    optimizer.load_state("benchmarkResults/schedule_optimization/optimizer_state_kclique_cubic_n8_p3.json")
+    # optimizer.maximize(n_iter=50, init_points=10)
+    # optimizer.save_state("benchmarkResults/schedule_optimization/optimizer_state_kclique_cubic_n8_p3.json")
+    # print(optimizer.max)
+
+    # optimize_schedule_power(optimizer.max["params"])
+
+    avg_prob, energies = run_qa(np.cumsum(list(optimizer.max["params"].values())))
+    # avg_prob, energies = run_qa(np.linspace(0, 1, n_params)[1:-1])
+    print(avg_prob)
+    # print(energies)
+
+    nrows = int(np.ceil(np.sqrt(len(energies))))
+    ncols = len(energies)//nrows
+    fig, ax = plt.subplots(nrows, ncols)
+    for i,e in enumerate(energies):
+        instance_energies = np.array(e)
+        instance_energies = instance_energies - np.reshape(instance_energies[:,0], (len(instance_energies), 1))
+        for j in range(len(instance_energies[0])):
+            ax[i//ncols, i%ncols].plot(np.linspace(0, 1, len(instance_energies)), instance_energies[:,j])
+    plt.plot()
+    plt.show()
+
+    plt.figure()
+    cumsums = np.cumsum(list(optimizer.max["params"].values()))
+    cs = CubicSpline(np.linspace(0, 1, len(cumsums)+2), [0, *cumsums, 1])
+    plt.plot(np.linspace(0, 1, 30), cs(np.linspace(0, 1, 30)))
+    plt.show()
 
     # nodes = sorted(problem_instance["graph"].nodes)
     # n_qubits = len(nodes)

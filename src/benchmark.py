@@ -130,11 +130,7 @@ def benchmark_problem_sizes(problem_sizes, output_filename, problem, validate_so
         json.dump(out_dict, f)
     return out_dict
 
-def helper_validate_k_clique_solutions(g, x, p):
-    return validate_k_clique_solutions(g, x)
 
-def helper_validate_max_clique_solutions(g, x, p):
-    return validate_max_clique_solutions(g, x)
 
 if __name__ == "__main__":    
     pass
