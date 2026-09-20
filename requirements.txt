@@ -4,3 +4,4 @@ ipykernel
 tqdm
 matplotlib
 qiskit-aer
+pylcs

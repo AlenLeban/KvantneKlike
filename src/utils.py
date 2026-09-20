@@ -3,6 +3,7 @@ import math
 import random
 import numpy as np
 import networkx as nx
+import pylcs
 
 def is_number(s):
     try:
@@ -77,6 +78,36 @@ def generate_config_model_graph_instance(size_info):
         "graph": graph
     }
 
+def generate_d_deletion_graph(b, n, d, include_all_lengths=False):
+    graph = nx.Graph()
+    codewords = itertools.product(range(b), repeat=n)
+    codeword_strings = [''.join(str(val) for val in c) for c in codewords]
+    if include_all_lengths:
+        for i in range(n-1):
+            codewords2 = itertools.product(range(b), repeat=n-i-1)
+            codeword_strings2 = [''.join(str(val) for val in c) for c in codewords2]
+            codeword_strings.extend(codeword_strings2)
+    # print(codeword_strings)
+    graph.add_nodes_from(codeword_strings)
+    edges = []
+    # plt.figure()
+    for i in range(len(codeword_strings)):
+        for j in range(i+1, len(codeword_strings)):
+            s1 = codeword_strings[i]
+            s2 = codeword_strings[j]
+            dlcs = (len(s1) + len(s2) - 2 * pylcs.lcs_sequence_length(s1, s2)) / 2
+            if dlcs >= d + 1:
+                edges.append((s1, s2))
+
+    graph.add_edges_from(edges)
+
+    # nx.draw(graph, with_labels=True)
+    # plt.show()
+
+    return {
+        "graph": graph
+    }
+
 def validate_max_clique_solutions(problem_instance, solutions):
     max_clique_size = 0
     maximal_clique_counts = dict()
@@ -135,5 +166,4 @@ def er_max_clique_size(n, p):
 
 
 if __name__ == "__main__":
-
-    print(er_max_clique_size(10, 0.4))
+    pass

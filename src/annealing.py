@@ -341,61 +341,25 @@ def run_quantum_annealing(
 
     times = np.linspace(0, annealing_time, n_steps)
 
-    if not use_noise:
-        result = qt.sesolve(
-            H_t,
-            psi0,
-            times,
-            options={"store_final_state": True, "store_states": False}
-        )
-    else:
+    # if not use_noise:
+    result = qt.sesolve(
+        H_t,
+        psi0,
+        times,
+        options={"store_final_state": True, "store_states": False}
+    )
 
-        N = n_qubits
-
-        def make_si(op, i, N):
-            op_list = [qt.qeye(2)] * N
-            op_list[i] = op
-            return qt.tensor(op_list)
-        
-        # 4. Define D-Wave Environmental Noise Channels (c_ops) for ALL qubits
-        gamma_dephase = 0.05    # Pure dephasing rate (flux noise)
-        gamma_relax = 0.02      # Thermal relaxation rate (T1)
-
-        c_ops = []
-        for i in range(N):
-            # In D-Wave, flux noise acts locally via each qubit's Z axis
-            c_dephase = np.sqrt(gamma_dephase) * make_si(qt.sigmaz(), i, N)
-            
-            # Energy relaxation and thermal excitation acting locally on each qubit
-            c_down = np.sqrt(gamma_relax * 0.9) * make_si(qt.destroy(2), i, N)
-            c_up   = np.sqrt(gamma_relax * 0.1) * make_si(qt.create(2), i, N)
-            
-            # Add this qubit's noise channels to the global list
-
-            c_ops.extend([c_dephase, c_down, c_up])
-
-        # Track the expectation value of <Sigma_Z> for every individual qubit
-        e_ops = [make_si(qt.sigmaz(), i, N) for i in range(N)]
-
-        result = qt.mesolve(
-            H_t,
-            psi0,
-            times,
-            c_ops=c_ops,
-            e_ops=e_ops,
-            options={"store_final_state": True, "store_states": False}
-        )
-
-    problem_energies = np.real(H_problem.eigenenergies(sparse=True, sort="low"))
+    problem_energies = np.real(H_problem.eigenenergies(sort="low"))
     problem_energy_range = problem_energies[-1] - problem_energies[0]
+    H_problem
 
     final_state = result.final_state
     energies_array = None
     if return_eigenenergies:
         energies_array = []
-        for t in tqdm(times[:-1]):
+        for t in times[:-1]:
             H_at_t = H_t(t)
-            energies = np.real(H_at_t.eigenenergies(sparse=True, eigvals=10, sort="low")) / problem_energy_range
+            energies = np.real(H_at_t.eigenenergies(eigvals=6, sort="low")) / problem_energy_range
             energies_array.append(energies.tolist()) 
 
     gc.collect()
@@ -408,35 +372,56 @@ def run_quantum_annealing(
 
 if __name__ == "__main__":
 
+
     # problem_instance = {
     #     "graph": nx.erdos_renyi_graph(13, 0.6),
     #     "k": 5
     # }
-
     def run_qa(schedule_params):
+
+        return_eigenenergies = True
+
+        # results = test_problem_sizes_qa(
+        #     # [{"n": 9, "p": 0.4, "k": None, "schedule": "lin_interp", "schedule_params": list(params.values())}],
+        #     # [{"n": 9, "p": 0.4, "k": None, "schedule": "lin_interp", "schedule_params": offsets}],
+        #     sizes=[{"n": 8, "p": 0.4, "k": er_max_clique_size(8, 0.4)-1, "schedule": "cubic_interp", "schedule_params": schedule_params, "steps":30}],
+        #     generate_instance=generate_k_clique_instance,
+        #     instance_count=100,
+        #     problem=qa_k_clique_bqm,
+        #     validate_solutions=helper_validate_k_clique_solutions,
+        #     iters=1,
+        #     max_workers=12,
+        #     return_eigenenergies=return_eigenenergies
+        # )
+
         results = test_problem_sizes_qa(
             # [{"n": 9, "p": 0.4, "k": None, "schedule": "lin_interp", "schedule_params": list(params.values())}],
             # [{"n": 9, "p": 0.4, "k": None, "schedule": "lin_interp", "schedule_params": offsets}],
-            sizes=[{"n": 8, "p": 0.4, "k": er_max_clique_size(8, 0.4)-1, "schedule": "cubic_interp", "schedule_params": schedule_params, "steps":30}],
-            generate_instance=generate_k_clique_instance,
-            instance_count=12,
-            problem=qa_k_clique_bqm,
-            validate_solutions=helper_validate_k_clique_solutions,
+            sizes=[{"n": 8, "p": 0.4, "k": None, "schedule": "cubic_interp", "schedule_params": schedule_params, "steps":30}],
+            generate_instance=generate_random_graph_instance,
+            instance_count=200,
+            problem=qa_max_clique_bqm,
+            validate_solutions=helper_validate_max_clique_solutions,
             iters=1,
             max_workers=12,
-            return_eigenenergies=True
+            return_eigenenergies=return_eigenenergies
         )
 
         # foreach problem size, foreach instance [success prob and energies]
         # probs = [p["success_probability"] for p in results]
         total_prob = 0
+        probs = []
         for r in results[0]:
-            total_prob += r[0]["success_probability"]
-        avg_prob = total_prob / len(results[0])
-
-        energies_over_time = [p[1] for p in results[0]]
-
-        return avg_prob, energies_over_time
+            print(r[0])
+            if return_eigenenergies:
+                probs.append(r[0]["success_probability"])
+            else:
+                probs.append(r["success_probability"])
+        if return_eigenenergies:
+            energies_over_time = [p[1] for p in results[0]]
+        else:
+            energies_over_time = None
+        return probs, energies_over_time
 
     def bo_run_qa(**params):
 
@@ -464,11 +449,12 @@ if __name__ == "__main__":
         #     max_workers=12
         # )
 
-        avg_prob, _ = run_qa(offsets)
+        probs, _ = run_qa(offsets)
+        avg_prob = sum(probs) / len(probs)
         return avg_prob
 
-    acquisition_function = acquisition.ExpectedImprovement(xi=0.05)
-    n_params = 3
+    acquisition_function = acquisition.ExpectedImprovement(xi=0.02)
+    n_params = 6
     pbounds = {f"p{i}": (0, 0.6) for i in range(n_params)}
     print(pbounds)
     optimizer = BayesianOptimization(
@@ -478,33 +464,95 @@ if __name__ == "__main__":
         allow_duplicate_points=True,
         acquisition_function=acquisition_function
     )
-    optimizer.load_state("benchmarkResults/schedule_optimization/optimizer_state_kclique_cubic_n8_p3.json")
-    # optimizer.maximize(n_iter=50, init_points=10)
-    # optimizer.save_state("benchmarkResults/schedule_optimization/optimizer_state_kclique_cubic_n8_p3.json")
+    # optimizer.load_state("benchmarkResults/schedule_optimization/optimizer_state_maxclique_linear_n8_p4_6param.json")
+    # optimizer.probe([1/7]*6)
+    # optimizer.maximize(n_iter=100, init_points=5)
+    # optimizer.save_state("benchmarkResults/schedule_optimization/optimizer_state_maxclique_linear_n8_p4_6param.json")
     # print(optimizer.max)
 
     # optimize_schedule_power(optimizer.max["params"])
 
-    avg_prob, energies = run_qa(np.cumsum(list(optimizer.max["params"].values())))
-    # avg_prob, energies = run_qa(np.linspace(0, 1, n_params)[1:-1])
-    print(avg_prob)
+
+    # experiments
+
+
+    # filename = "qa_gap_results_kclique_boquadratic.json"
+    # probs, energies = run_qa(np.cumsum(list(optimizer.max["params"].values())))
+
+
+    # filename = "qa_gap_results_kclique_linear.json"
+    # probs, energies = run_qa(np.linspace(0, 1, n_params+2)[1:-1])
+
+    # optimizer.load_state("benchmarkResults/schedule_optimization/optimizer_state_maxclique_linear_n8_p4_6param.json")
+    # filename = "qa_gap_results_maxclique_lininterp.json"
+    # probs, energies = run_qa(np.cumsum(list(optimizer.max["params"].values())))
+
+    optimizer.load_state("benchmarkResults/schedule_optimization/optimizer_state_maxclique_cubic_n8_p4_6param.json")
+    filename = "qa_gap_results_maxclique_boquadratic.json"
+    probs, energies = run_qa(np.cumsum(list(optimizer.max["params"].values())))
+
+    # filename = "qa_gap_results_maxclique_linear.json"
+    # probs, energies = run_qa(np.linspace(0, 1, n_params+2)[1:-1])
+
+    # filename = "qa_gap_results_maxclique_boquadratic.json"
+    # probs, energies = run_qa(np.cumsum(list(optimizer.max["params"].values())))
+
+    append_graphs = True
+    avg_probs = np.mean(probs)
+    energies_np = np.array(energies)
+    out_data = []
+    for i in range(len(energies)):
+        ground_state_degeneracy = sum([e - energies[i][-1][0] < 1e-03 for e in energies[i][-1]])
+        # print(ground_state_degeneracy)
+        if ground_state_degeneracy == len(energies_np[i,0]):
+            continue
+        # print(energies[i][-1])
+        # print(energies_np[i,:,ground_state_degeneracy] - energies_np[i,:,0])
+        min_gap = np.min(energies_np[i,:,ground_state_degeneracy] - energies_np[i,:,0])
+        # print(min_gap)
+        out_data.append({
+            "min_gap": min_gap,
+            "prob": probs[i]
+        })
     # print(energies)
 
-    nrows = int(np.ceil(np.sqrt(len(energies))))
-    ncols = len(energies)//nrows
-    fig, ax = plt.subplots(nrows, ncols)
-    for i,e in enumerate(energies):
-        instance_energies = np.array(e)
-        instance_energies = instance_energies - np.reshape(instance_energies[:,0], (len(instance_energies), 1))
-        for j in range(len(instance_energies[0])):
-            ax[i//ncols, i%ncols].plot(np.linspace(0, 1, len(instance_energies)), instance_energies[:,j])
-    plt.plot()
-    plt.show()
+
+    out_dict = None
+    if append_graphs:
+        try:
+            with open(f"benchmarkResults/min_gap/{filename}", "r") as f:
+                out_dict = json.load(f)
+        except:
+            print(f"Unable to open benchmarkResults/min_gap/f{filename} to append graphs")
+
+    with open(f"benchmarkResults/min_gap/{filename}", "w") as f:
+        if out_dict != None:
+            out_data.extend(out_dict["samples"])
+        json.dump({
+            "samples": out_data
+        }, f)
+
+    # nrows = int(np.ceil(np.sqrt(len(energies))))
+    # ncols = int(np.ceil(len(energies)/nrows))
+    # print(nrows, ncols)
+    # fig, ax = plt.subplots(nrows, ncols, squeeze=False)
+    # for i,e in enumerate(energies):
+    #     instance_energies = np.array(e)
+    #     instance_energies = instance_energies - np.reshape(instance_energies[:,0], (len(instance_energies), 1))
+    #     for j in range(len(instance_energies[0])):
+    #         ax[i//ncols, i%ncols].plot(np.linspace(0, 1, len(instance_energies)), instance_energies[:,j])
+    # plt.plot()
+    # plt.show()
 
     plt.figure()
+    # cumsums = np.cumsum(list(optimizer.max["params"].values()))
+    # cs = CubicSpline(np.linspace(0, 1, len(cumsums)+2), [0, *cumsums, 1])
+    # plt.plot(np.linspace(0, 1, 30), cs(np.linspace(0, 1, 30)))
+
+    # lininterp
+
     cumsums = np.cumsum(list(optimizer.max["params"].values()))
-    cs = CubicSpline(np.linspace(0, 1, len(cumsums)+2), [0, *cumsums, 1])
-    plt.plot(np.linspace(0, 1, 30), cs(np.linspace(0, 1, 30)))
+    plt.plot(np.linspace(0, 1, 8), [0, *cumsums, 1])
     plt.show()
 
     # nodes = sorted(problem_instance["graph"].nodes)
