@@ -10,5 +10,6 @@ def helper_validate_max_clique_solutions(g, x, p):
 def helper_validate_k_clique_solutions(g, x, p):
     return validate_k_clique_solutions(g, x)
 
+
 # if __name__ == "__main__":
 #     g = generate_d_deletion_graph(4, 2, 1, include_all_lengths=False)

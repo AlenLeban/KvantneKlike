@@ -102,7 +102,7 @@ def build_kclique_paulis_fixed(problem_instance, problem_size):
         pauli_list.append((pauli, list(qubits), coeff))
     return pauli_list
 
-def build_kclique_paulis_mis(problem_instance):
+def build_kclique_paulis_mis(problem_instance, problem_size):
     
     graph = problem_instance["graph"]
     k = problem_instance["k"]

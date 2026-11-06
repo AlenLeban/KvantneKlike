@@ -115,7 +115,6 @@ def benchmark_problem_sizes(problem_sizes, output_filename, problem, validate_so
                                 out_dict["num_graphs"] if not append_graphs else num_graphs, 
                                 problem=problem, 
                                 validate_solutions=validate_solutions,
-                                iters=iters,
                                 max_workers=max_workers,
                                 use_noise=use_noise,
                                 return_eigenenergies=return_eigenenergies
@@ -156,27 +155,87 @@ def run_qa(schedule_params, sizes, generate_instance, instance_count, problem, v
         instance_count=instance_count,
         problem=problem,
         validate_solutions=validate_solutions,
-        iters=1,
         max_workers=max_workers,
         return_eigenenergies=return_eigenenergies
     )
 
     # foreach problem size, foreach instance [success prob and energies]
     # probs = [p["success_probability"] for p in results]
-    total_prob = 0
-    probs = []
-    for r in results[0]:
-        if return_eigenenergies:
-            probs.append(r[0]["success_probability"])
-        else:
-            probs.append(r["success_probability"])
-    if return_eigenenergies:
-        energies_over_time = [p[1] for p in results[0]]
-    else:
-        energies_over_time = None
-    return probs, energies_over_time
+    return results
+    # for r in results:
+    #     print(str(r)[:100])
+    # total_prob = 0
+    # probs = []
+    # for r in results[0]:
+    #     if return_eigenenergies:
+    #         probs.append(r[0]["success_probability"])
+    #     else:
+    #         probs.append(r["success_probability"])
+    # if return_eigenenergies:
+    #     energies_over_time = [p[1] for p in results[0]]
+    # else:
+    #     energies_over_time = None
+    # return {
+    #     "probabilities": probs,
+    #     "eigenenergies": energies_over_time,
+    #     ""
+    # }
 
+def qa_test_energies(results_filename, sizes, generate_instance, instance_count, problem, validate_solutions, schedule_params, max_workers=12, **kwargs):
+    results = run_qa(schedule_params, sizes, generate_instance, instance_count, problem, validate_solutions, max_workers, kwargs.get("eigenenergies", True))
+    # print(probs)
+    # avg_probs = np.mean(probs)
+    out_data = []
+    for size_results in results:
+        per_size_data = []
+        for i_result in size_results:
+            probability = i_result["success_probability"]
+            if kwargs.get("eigenenergies", True):
+                energies = i_result["eigenenergies"]
+                times = i_result["times"]
+                energies_np = np.array(energies)
+                ground_state_degeneracy = sum([e - energies[-1][0] < 1e-03 for e in energies[-1]])
+                # print(ground_state_degeneracy)
+                if ground_state_degeneracy == len(energies_np[0]):
+                    continue
+                # print(energies[i][-1])
+                # print(energies_np[i,:,ground_state_degeneracy] - energies_np[i,:,0])
+                zero_ground_energies = energies_np[:,ground_state_degeneracy] - energies_np[:,0]
+                min_gap_position_index = np.argmin(zero_ground_energies)
+                min_gap_position = times[min_gap_position_index]
+                min_gap = zero_ground_energies[min_gap_position_index]
+                # print(min_gap)
+                per_size_data.append({
+                    "min_gap": min_gap,
+                    "min_gap_position_t": min_gap_position,
+                    "prob": probability,
+                    "graph_info": i_result["graph_info"],
+                    "eigenenergies": energies
+                })
+            else:
+                per_size_data.append({
+                    "prob": probability,
+                    "graph_info": i_result["graph_info"],
+                })
+        out_data.append(per_size_data)
+    # print(out_data)
 
+    out_dict = None
+    if kwargs.get("append_graphs", False):
+        try:
+            with open(results_filename, "r") as f:
+                out_dict = json.load(f)
+        except:
+            print(f"Unable to open {results_filename} to append graphs")
+
+    with open(results_filename, "w") as f:
+        if out_dict != None:
+            for i in range(len(sizes)):
+                out_data[i].extend(out_dict["samples"][i])
+        json.dump({
+            "sizes": sizes,
+            "samples": out_data
+        }, f)
 
 
 def qa_bo_optimize_schedule(optimizer_state_filename, sizes, generate_instance, instance_count, problem, validate_solutions, max_workers=12, return_eigenenergies=False, n_params=6, n_iter=50, init_points=10, probe_points=[], **kwargs):
@@ -184,23 +243,28 @@ def qa_bo_optimize_schedule(optimizer_state_filename, sizes, generate_instance, 
     def bo_run_qa(**params):
 
         # constraint that each next value must be larger
-        if sum(list(params.values())) > 1:
-            return 0
 
-        offsets = [0]
-        for v in list(params.values()):
-            current_sum = offsets[-1] + v
-            if current_sum > 1 or current_sum < 0:
+        parameter_type = kwargs.get("parameter_type", "offset")
+        if parameter_type == "offset":
+            if sum(list(params.values())) > 1:
                 return 0
-            offsets.append(offsets[-1] + v)
-        offsets = offsets[1:]
+            offsets = [0]
+            for v in list(params.values()):
+                current_sum = offsets[-1] + v
+                if current_sum > 1 or current_sum < 0:
+                    return 0
+                offsets.append(offsets[-1] + v)
+            offsets = offsets[1:]
+            schedule_params = offsets
+        elif parameter_type == "absolute":
+            schedule_params = list(params.values())
 
-        probs, _ = run_qa(offsets, sizes, generate_instance, instance_count, problem, validate_solutions, max_workers, return_eigenenergies)
+        probs, _ = run_qa(schedule_params, sizes, generate_instance, instance_count, problem, validate_solutions, max_workers, return_eigenenergies)
         avg_prob = sum(probs) / len(probs)
         return avg_prob
 
     acquisition_function = acquisition.ExpectedImprovement(xi=kwargs.get("alpha", 0.02))
-    pbounds = {f"p{i}": (0, 0.6) for i in range(n_params)}
+    pbounds = {f"p{i}": kwargs.get("bounds", (0, 0.6)) for i in range(n_params)}
     print(pbounds)
     optimizer = BayesianOptimization(
         f=bo_run_qa,

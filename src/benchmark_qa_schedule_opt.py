@@ -6,16 +6,19 @@ from utils import generate_k_clique_instance, generate_random_graph_instance
 if __name__ == "__main__":
 
     # optimize qa schedule function using BO
-    qa_bo_optimize_schedule("benchmarkResults/schedule_optimization/optimizer_state_maxclique_lininterp_n8_p6.json", 
-                            [{"n": 8, "p": 0.6, "k": None, "schedule_function": "lin_interp"}],
+    qa_bo_optimize_schedule("benchmarkResults/schedule_optimization/optimizer_state_maxclique_linearpower_n10_p4.json", 
+                            [{"n": 10, "p": 0.4, "k": None, "schedule": "linear_power", "B": 4, "T":20}],
                             generate_instance=generate_random_graph_instance,
-                            instance_count=300,
+                            instance_count=50,
                             problem=qa_max_clique_bqm,
                             validate_solutions=helper_validate_max_clique_solutions,
                             iters=1,
-                            max_workers=12,
+                            max_workers=10,
                             return_eigenenergies=False,
                             n_iter=50,
-                            n_params=5,
-                            probe_points=[[1/6, 1/6, 1/6, 1/6, 1/6]]
+                            n_params=1,
+                            probe_points=[[1]],
+                            alpha=0.04,
+                            bounds=(0.7, 1.3),
+                            parameter_type="absolute"
                         )

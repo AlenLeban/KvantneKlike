@@ -1,6 +1,7 @@
 import numpy as np
-from benchmark import benchmark_problem_sizes, helper_validate_k_clique_solutions, helper_validate_max_clique_solutions
+from benchmark import benchmark_problem_sizes, helper_validate_max_clique_solutions
 from qaoa import build_kclique_paulis_fixed, build_kclique_paulis_mis, build_maxclique_mis_paulis, test_problem_sizes_qaoa
+from helper_functions import helper_validate_k_clique_solutions
 from utils import er_max_clique_size, generate_k_clique_instance, generate_random_graph_instance, validate_k_clique_solutions, validate_max_clique_solutions
 
 if __name__ == "__main__":    
@@ -12,16 +13,33 @@ if __name__ == "__main__":
 
     # test qaoa on findinig k-clique, different n
     # benchmark_problem_sizes(
-    #     [ {"n": n, "p": 0.4, "k": er_max_clique_size(n, 0.4)-1, "iters_per_graph" : 4, "layers": 2} for n in range(6, 14, 1)],
-    #     "qaoa_results_kclique_n.json",
-    #     problem=build_kclique_paulis_mis,
+    #     [ {"n": n, "p": 0.5, "k": -1, "iters_per_graph" : 4, "layers": 2, "B": 2} for n in range(6, 14, 1)],
+    #     "2qaoa_results_kclique_n.json",
+    #     problem=build_kclique_paulis_fixed,
     #     validate_solutions=helper_validate_k_clique_solutions,
     #     instance_generator=generate_k_clique_instance,
     #     # intermediate_results_filename="qaoa_results_kclique_n_intermediate.json",
     #     num_graphs=200,
     #     method="QAOA",
-    #     append_graphs=False
+    #     max_workers=10,
+    #     append_graphs=True
     # )
+
+    # test qaoa on findinig max-clique, different p
+    for i in range(10):
+        print(f"Iteration {i}")
+        benchmark_problem_sizes(
+            [ {"n": 14, "p": float(p), "k": -1, "iters_per_graph" : 4, "layers": 2, "B": 1.1} for p in np.linspace(0.01, 0.99, 50)],
+            "2qaoa_results_maxclique_er_p_n14.json",
+            problem=build_kclique_paulis_fixed,
+            validate_solutions=helper_validate_k_clique_solutions,
+            instance_generator=generate_k_clique_instance,
+            # intermediate_results_filename="qaoa_results_kclique_n_intermediate.json",
+            num_graphs=300,
+            method="QAOA",
+            append_graphs=True,
+            max_workers=10
+        )
 
     # test qaoa on findinig k-clique, different n, fixed version
     # benchmark_problem_sizes(
@@ -136,31 +154,50 @@ if __name__ == "__main__":
 
     # test qaoa on findinig max-clique, different n
     # benchmark_problem_sizes(
-    #     [ {"n": n, "p": 0.4, "k": None, "iters_per_graph" : 4, "layers": 2} for n in range(6, 14, 1)],
-    #     "qaoa_results_maxclique_n.json",
+    #     [ {"n": n, "p": 0.5, "k": None, "iters_per_graph" : 4, "layers": 2, "B": 2} for n in range(6, 14, 1)],
+    #     "2qaoa_results_maxclique_n.json",
     #     problem=build_maxclique_mis_paulis,
     #     validate_solutions=helper_validate_max_clique_solutions,
     #     instance_generator=generate_random_graph_instance,
     #     # intermediate_results_filename="qaoa_results_kclique_n_intermediate.json",
-    #     num_graphs=100,
+    #     num_graphs=200,
     #     method="QAOA",
+    #     max_workers=10,
     #     append_graphs=True
     # )
 
+    # test qaoa on findinig max-clique, different p
+    # for i in range(10):
+    #     print(f"Iteration {i}")
+    #     benchmark_problem_sizes(
+    #         [ {"n": 14, "p": float(p), "k": None, "iters_per_graph" : 4, "layers": 2, "B": 1.1} for p in np.linspace(0.01, 0.99, 50)],
+    #         "qaoa_results_maxclique_er_p_n14.json",
+    #         problem=build_maxclique_mis_paulis,
+    #         validate_solutions=helper_validate_max_clique_solutions,
+    #         instance_generator=generate_random_graph_instance,
+    #         # intermediate_results_filename="qaoa_results_kclique_n_intermediate.json",
+    #         num_graphs=30,
+    #         method="QAOA",
+    #         append_graphs=True,
+    #         max_workers=8 
+    #     )
+
+    
+
     # test qaoa on finding-maxclique, different B, different n
-    for i in range(10):
-        print(f"Iteration {i}")
-        benchmark_problem_sizes(
-            # [ {"n": n, "p": 0.4, "k": None, "iters_per_graph" : 4, "B": float(b)} for b in np.arange(0.25, 2.0, 0.25) for n in [75, 125, 205, 340]],
-            [ {"n": int(n), "p": 0.4, "k": None, "iters_per_graph" : 4, "B": float(b), "layers": 2} for b in [0.3, 0.4, 0.5, 0.6, 0.7] for n in [6, 8, 11, 14]],
-            "qaoa_results_maxclique_n_b2.json",
-            problem=build_maxclique_mis_paulis,
-            validate_solutions=helper_validate_max_clique_solutions,
-            instance_generator=generate_random_graph_instance,
-            num_graphs=50,
-            method="QAOA",
-            append_graphs=True,
-        )
+    # for i in range(10):
+    #     print(f"Iteration {i}")
+    #     benchmark_problem_sizes(
+    #         # [ {"n": n, "p": 0.4, "k": None, "iters_per_graph" : 4, "B": float(b)} for b in np.arange(0.25, 2.0, 0.25) for n in [75, 125, 205, 340]],
+    #         [ {"n": int(n), "p": 0.4, "k": None, "iters_per_graph" : 4, "B": float(b), "layers": 2} for b in [0.3, 0.4, 0.5, 0.6, 0.7] for n in [6, 8, 11, 14]],
+    #         "qaoa_results_maxclique_n_b2.json",
+    #         problem=build_maxclique_mis_paulis,
+    #         validate_solutions=helper_validate_max_clique_solutions,
+    #         instance_generator=generate_random_graph_instance,
+    #         num_graphs=50,
+    #         method="QAOA",
+    #         append_graphs=True,
+    #     )
 
     # test qaoa on findinig max-clique, different n
     # benchmark_problem_sizes(

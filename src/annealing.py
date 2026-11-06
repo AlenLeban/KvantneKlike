@@ -23,7 +23,7 @@ from dwave.samplers import PathIntegralAnnealingSampler
 from tqdm import tqdm
 
 from helper_functions import helper_validate_max_clique_solutions, helper_validate_k_clique_solutions
-from utils import er_max_clique_size, generate_graph_with_k_clique, generate_k_clique_instance, generate_random_graph_instance, is_number
+from utils import er_max_clique_size, generate_graph_with_k_clique, generate_k_clique_instance, generate_random_graph_instance, graph_info, is_number, generate_specific_instance_from_file
 
 
 def qa_max_clique_bqm(problem_instance, problem_size):
@@ -60,7 +60,7 @@ def qa_k_clique_bqm(problem_instance, problem_size):
 def geometric_1(a,b,c):
     return np.geomspace(a+1, b+1, c) - 1
 
-def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, iters=10, use_noisy_sampler=False, return_eigenenergies=False):
+def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, use_noisy_sampler=False, return_eigenenergies=False):
 
     bqm = problem(problem_instance, problem_size)
     graph = problem_instance["graph"]
@@ -96,6 +96,8 @@ def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, i
 
     success_probability = 0.0
 
+    prob_sol = []
+
     for state in range(2**n_qubits):
         solution = [
             1 if state & 2**(n_qubits - 1 - i) else 0
@@ -104,32 +106,35 @@ def test_graph_qa(problem_instance, problem, validate_solutions, problem_size, i
 
         if validate_solutions([solution])["found_solution"]:
             success_probability += probs[state]
+
+        prob_sol.append((probs[state], solution))
+
+    # print(sorted(prob_sol, reverse=True)[:20])
     
-    return_payload = [
-        {
-            "success_probability": success_probability
+    return_payload = {
+            "success_probability": success_probability,
+            "graph_info": graph_info(graph),
+            "times": times
         }
-    ]
     if return_eigenenergies:
-        return_payload.append(energies)
-    return return_payload[0] if len(return_payload) == 1 else return_payload
+        return_payload["eigenenergies"] = energies
+    return return_payload
 
 
 
 def qa_graph_worker(args):
-    problem_instance, problem_size, problem, validate_solutions, iters, use_noise, return_eigenenergies = args
+    problem_instance, problem_size, problem, validate_solutions, use_noise, return_eigenenergies = args
 
     return test_graph_qa(
         problem_instance=problem_instance,
         problem=problem,
         validate_solutions=lambda bitstrings: validate_solutions(problem_instance, bitstrings, problem_size),
         problem_size=problem_size,
-        iters=iters if iters is not None else problem_size["iters_per_graph"],
         use_noisy_sampler=use_noise,
         return_eigenenergies=return_eigenenergies
     )
 
-def test_problem_sizes_qa(sizes, generate_instance, instance_count, problem, validate_solutions, iters=None, max_workers=4, use_noise=False, return_eigenenergies=False):
+def test_problem_sizes_qa(sizes, generate_instance, instance_count, problem, validate_solutions, max_workers=4, use_noise=False, return_eigenenergies=False):
     validation_results_per_size = []
 
     for s in sizes:
@@ -138,7 +143,7 @@ def test_problem_sizes_qa(sizes, generate_instance, instance_count, problem, val
         problem_instances = [generate_instance(s) for _ in range(instance_count)]
 
         args = [
-            (problem_instance, s, problem, validate_solutions, iters, use_noise, return_eigenenergies)
+            (problem_instance, s, problem, validate_solutions, use_noise, return_eigenenergies)
             for problem_instance in problem_instances
         ]
 
@@ -286,11 +291,14 @@ def run_quantum_annealing(
     )
 
     psi0 = initial_plus_state(n_qubits)
-
     # Annealing schedule s(t)
     if schedule == "linear":
         def s_schedule(t):
             return t / annealing_time
+
+    elif schedule == "linear_power":
+        def s_schedule(t):
+            return np.pow(t / annealing_time, schedule_params[0])
 
     elif schedule == "lin_interp":
         def s_schedule(t):
@@ -351,28 +359,60 @@ def run_quantum_annealing(
 
     problem_energies = np.real(H_problem.eigenenergies(sort="low"))
     problem_energy_range = problem_energies[-1] - problem_energies[0]
-    H_problem
 
     final_state = result.final_state
     energies_array = None
+    previous_ground_state = None
     if return_eigenenergies:
         energies_array = []
         for t in times[:-1]:
             H_at_t = H_t(t)
-            energies = np.real(H_at_t.eigenenergies(eigvals=6, sort="low")) / problem_energy_range
-            energies_array.append(energies.tolist()) 
+            H_sparse = H_at_t.data_as("csr_matrix")
+            energies, eigenvectors = eigsh(
+                H_sparse,
+                k=6,
+                which="SA",
+                v0=previous_ground_state,
+                tol=1e-8,
+            )
+            previous_ground_state = eigenvectors[:, 0]
+            # energies = np.real(H_at_t.eigenenergies(eigvals=6, sort="low")) / problem_energy_range
+            order = np.argsort(energies)
+            energies = energies[order]
+            eigenvectors = eigenvectors[:, order]
+            energies_array.append(
+                (energies / problem_energy_range).tolist()
+            )
 
     gc.collect()
     del H_problem
     del psi0
     del H_initial
     del result
-    return times, final_state, energies_array
+    return times / annealing_time, final_state, energies_array
 
 
 if __name__ == "__main__":
 
 
+    with open("benchmark_data/er_hard_classical/max_clique/er_10_05", "r") as f:
+        data = json.load(f)
+
+    instance_index = 0
+
+    problem_instance = {
+        "graph": nx.parse_adjlist(data[instance_index]["graph"]),
+        "k": None
+    }
+    print(problem_instance)
+    result = test_problem_sizes_qa(
+        [{"n": 10, "p": 0.5, "steps": 60, "T": 40}], 
+        generate_instance=lambda s: generate_specific_instance_from_file("benchmark_data/er_hard_classical/max_clique/er_10_05", 0),
+        validate_solutions=helper_validate_max_clique_solutions,
+        problem=qa_max_clique_bqm, 
+        instance_count=1,
+        return_eigenenergies=True)
+    print(result)
     # problem_instance = {
     #     "graph": nx.erdos_renyi_graph(13, 0.6),
     #     "k": 5
@@ -453,17 +493,17 @@ if __name__ == "__main__":
         avg_prob = sum(probs) / len(probs)
         return avg_prob
 
-    acquisition_function = acquisition.ExpectedImprovement(xi=0.02)
-    n_params = 6
-    pbounds = {f"p{i}": (0, 0.6) for i in range(n_params)}
-    print(pbounds)
-    optimizer = BayesianOptimization(
-        f=bo_run_qa,
-        pbounds=pbounds,
-        verbose=2,
-        allow_duplicate_points=True,
-        acquisition_function=acquisition_function
-    )
+    # acquisition_function = acquisition.ExpectedImprovement(xi=0.02)
+    # n_params = 6
+    # pbounds = {f"p{i}": (0, 0.6) for i in range(n_params)}
+    # print(pbounds)
+    # optimizer = BayesianOptimization(
+    #     f=bo_run_qa,
+    #     pbounds=pbounds,
+    #     verbose=2,
+    #     allow_duplicate_points=True,
+    #     acquisition_function=acquisition_function
+    # )
     # optimizer.load_state("benchmarkResults/schedule_optimization/optimizer_state_maxclique_linear_n8_p4_6param.json")
     # optimizer.probe([1/7]*6)
     # optimizer.maximize(n_iter=100, init_points=5)
@@ -487,9 +527,9 @@ if __name__ == "__main__":
     # filename = "qa_gap_results_maxclique_lininterp.json"
     # probs, energies = run_qa(np.cumsum(list(optimizer.max["params"].values())))
 
-    optimizer.load_state("benchmarkResults/schedule_optimization/optimizer_state_maxclique_cubic_n8_p4_6param.json")
-    filename = "qa_gap_results_maxclique_boquadratic.json"
-    probs, energies = run_qa(np.cumsum(list(optimizer.max["params"].values())))
+    # optimizer.load_state("benchmarkResults/schedule_optimization/optimizer_state_maxclique_cubic_n8_p4_6param.json")
+    # filename = "qa_gap_results_maxclique_boquadratic.json"
+    # probs, energies = run_qa(np.cumsum(list(optimizer.max["params"].values())))
 
     # filename = "qa_gap_results_maxclique_linear.json"
     # probs, energies = run_qa(np.linspace(0, 1, n_params+2)[1:-1])
@@ -497,40 +537,40 @@ if __name__ == "__main__":
     # filename = "qa_gap_results_maxclique_boquadratic.json"
     # probs, energies = run_qa(np.cumsum(list(optimizer.max["params"].values())))
 
-    append_graphs = True
-    avg_probs = np.mean(probs)
-    energies_np = np.array(energies)
-    out_data = []
-    for i in range(len(energies)):
-        ground_state_degeneracy = sum([e - energies[i][-1][0] < 1e-03 for e in energies[i][-1]])
-        # print(ground_state_degeneracy)
-        if ground_state_degeneracy == len(energies_np[i,0]):
-            continue
-        # print(energies[i][-1])
-        # print(energies_np[i,:,ground_state_degeneracy] - energies_np[i,:,0])
-        min_gap = np.min(energies_np[i,:,ground_state_degeneracy] - energies_np[i,:,0])
-        # print(min_gap)
-        out_data.append({
-            "min_gap": min_gap,
-            "prob": probs[i]
-        })
+    # append_graphs = True
+    # avg_probs = np.mean(probs)
+    # energies_np = np.array(energies)
+    # out_data = []
+    # for i in range(len(energies)):
+    #     ground_state_degeneracy = sum([e - energies[i][-1][0] < 1e-03 for e in energies[i][-1]])
+    #     # print(ground_state_degeneracy)
+    #     if ground_state_degeneracy == len(energies_np[i,0]):
+    #         continue
+    #     # print(energies[i][-1])
+    #     # print(energies_np[i,:,ground_state_degeneracy] - energies_np[i,:,0])
+    #     min_gap = np.min(energies_np[i,:,ground_state_degeneracy] - energies_np[i,:,0])
+    #     # print(min_gap)
+    #     out_data.append({
+    #         "min_gap": min_gap,
+    #         "prob": probs[i]
+    #     })
     # print(energies)
 
 
-    out_dict = None
-    if append_graphs:
-        try:
-            with open(f"benchmarkResults/min_gap/{filename}", "r") as f:
-                out_dict = json.load(f)
-        except:
-            print(f"Unable to open benchmarkResults/min_gap/f{filename} to append graphs")
+    # out_dict = None
+    # if append_graphs:
+    #     try:
+    #         with open(f"benchmarkResults/min_gap/{filename}", "r") as f:
+    #             out_dict = json.load(f)
+    #     except:
+    #         print(f"Unable to open benchmarkResults/min_gap/f{filename} to append graphs")
 
-    with open(f"benchmarkResults/min_gap/{filename}", "w") as f:
-        if out_dict != None:
-            out_data.extend(out_dict["samples"])
-        json.dump({
-            "samples": out_data
-        }, f)
+    # with open(f"benchmarkResults/min_gap/{filename}", "w") as f:
+    #     if out_dict != None:
+    #         out_data.extend(out_dict["samples"])
+    #     json.dump({
+    #         "samples": out_data
+    #     }, f)
 
     # nrows = int(np.ceil(np.sqrt(len(energies))))
     # ncols = int(np.ceil(len(energies)/nrows))
@@ -544,16 +584,16 @@ if __name__ == "__main__":
     # plt.plot()
     # plt.show()
 
-    plt.figure()
+    # plt.figure()
     # cumsums = np.cumsum(list(optimizer.max["params"].values()))
     # cs = CubicSpline(np.linspace(0, 1, len(cumsums)+2), [0, *cumsums, 1])
     # plt.plot(np.linspace(0, 1, 30), cs(np.linspace(0, 1, 30)))
 
     # lininterp
 
-    cumsums = np.cumsum(list(optimizer.max["params"].values()))
-    plt.plot(np.linspace(0, 1, 8), [0, *cumsums, 1])
-    plt.show()
+    # cumsums = np.cumsum(list(optimizer.max["params"].values()))
+    # plt.plot(np.linspace(0, 1, 8), [0, *cumsums, 1])
+    # plt.show()
 
     # nodes = sorted(problem_instance["graph"].nodes)
     # n_qubits = len(nodes)
