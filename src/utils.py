@@ -232,18 +232,34 @@ def graph_info(g: nx.Graph) -> dict:
         "smaller_clique_counts": smaller_clique_counts[1:]
     }
 
-def grover_mc_oracles_naive(n, correct_max_k, num_solutions, min_k=2): #TODO: Add steps for estimating num_solutions
+def grover_mc_oracles_naive(graph: nx.Graph, n, correct_max_k, num_solutions=None, min_k=2):
     steps = 0
+    manually_count = False
+    if num_solutions == None:
+        manually_count = True
+    num_edges = oracle_depth = graph.number_of_edges()
     for k in range(min_k, correct_max_k+1):
-        to_add = np.pi/4 * np.sqrt((2**n) / num_solutions)
+        oracle_depth = ((comb(n,2) - num_edges) + np.ceil(np.log2(k)) * n * 2)
+        if manually_count:
+            num_solutions = count_k_cliques(graph, k)
+        to_add = oracle_depth * np.pi/4 * np.sqrt((2**n) / num_solutions)
         # print(f"Add: {to_add}")
         steps += to_add
     return int(steps)
 
-def grover_mc_oracles_dicke(n, correct_max_k, num_solutions, min_k=2):
+def grover_mc_oracles_dicke(graph: nx.Graph, n, correct_max_k, num_solutions=None, min_k=2):
     steps = 0
+    manually_count = False
+    if num_solutions == None:
+        manually_count = True
+    num_edges = oracle_depth = graph.number_of_edges()
+
     for k in range(min_k, correct_max_k+1):
-        to_add = np.pi/4 * np.sqrt((comb(n, k)) / num_solutions)
+        oracle_depth = ((comb(n, 2) - num_edges) + np.ceil(np.log2(k)) * n * 2) # *2 to uncompute
+        if manually_count:
+            num_solutions = count_k_cliques(graph, k)
+        # print(f"k: {k}, sols: {num_solutions}")
+        to_add = oracle_depth * np.pi/4 * np.sqrt((comb(n, k)) / num_solutions)
         # print(f"Add: {to_add}")
         steps += to_add
     return int(steps)
